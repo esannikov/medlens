@@ -25,7 +25,7 @@ export function preview(lm: LensModel, n: LensNode, scope: Scope) {
     n.kind === "observation"
       ? `${value(n.object!)} ${n.object!.payload.source_unit || ""}`.trim()
       : n.kind === "finding"
-        ? "Точний опис і джерело"
+        ? ""
         : n.kind === "temporal_relation"
           ? `${n.object!.payload.relation_type === "decreased_from" ? "Зменшення" : n.object!.payload.relation_type === "unchanged_from" ? "Без змін" : "Порівняння"}${n.object!.payload.compatibility_receipt?.status === "partial" ? " · сумісність часткова" : ""}`
           : n.id === "group:temporal"
@@ -53,8 +53,31 @@ export function preview(lm: LensModel, n: LensNode, scope: Scope) {
     kind: nodeKinds[n.kind],
     content,
     time: lm.times.get(n.id)?.text || "",
-    action: n.children.length ? "Розкрити вміст" : "Читати запис і джерело",
+    action: n.children.length ? "Розкрити вміст" : "Читати запис",
   };
+}
+/** Navigation text is not a clinical summary. Full source titles stay intact
+ * in LensNode, the table and reader; never crop away a negation/qualification. */
+export function graphCaption(lm: LensModel, n: LensNode): {title: string; disclosure: boolean} {
+  if (!["finding", "temporal_relation"].includes(n.kind) || n.title.length <= 110)
+    return {title: n.title, disclosure: false};
+  const heading = n.title.match(/^([^:]{3,90}):\s/)?.[1];
+  if (heading && !/[.!?]/u.test(heading) && !/^(ВИСНОВОК|Заключення)$/iu.test(heading))
+    return {title: heading, disclosure: true};
+  const current = n.kind === "temporal_relation"
+    ? lm.nodes.get(n.object?.payload.current?.object_id) : n;
+  const kind = current?.object?.payload.finding_type;
+  const topics: Record<string,string> = {
+    bone_lesion_statement: "Опис кісток",
+    rib_fracture_statement: "Опис ребер",
+    renal_cyst_statement: "Опис нирок",
+    mesenteric_mass_statement: "Опис утворення брижі",
+    source_pathology_statement: "Патоморфологічний опис",
+  };
+  const event = current && lm.eventFor(current);
+  return {title: topics[kind] || (event?.payload.event_kind === "pathology_procedure"
+    ? "Морфологічний опис" : event?.payload.event_kind === "laboratory_panel"
+      ? "Коментар до дослідження" : "Розгорнутий опис"), disclosure: true};
 }
 export function neighborhood(lm: LensModel, selected: string, scope: Scope) {
   const node = lm.nodes.get(selected)!;
@@ -94,6 +117,9 @@ export type Label = Rect & {
   lines: string[];
   meta: string;
   content: string;
+  contentLines: string[];
+  detailLineHeight: number;
+  disclosure: boolean;
   dateLines: string[];
   dateY: number;
   dateLineHeight: number;
@@ -114,9 +140,9 @@ const family = "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
 export function lensTypography(distance: number) {
   const near = Math.max(0, Math.min(1, 1 - distance));
   return {
-    titleSize: 11.5 + 14.5 * near ** 0.8,
-    detailSize: 10 + 8 * near ** 0.8,
-    metaSize: 10 + 3 * near ** 0.8,
+    titleSize: 11.5 + 9.5 * near ** 0.8,
+    detailSize: 10 + 6 * near ** 0.8,
+    metaSize: 10 + 2 * near ** 0.8,
   };
 }
 
@@ -274,13 +300,13 @@ export function placeLabels(
     const n = lm.nodes.get(p.id)!,
       info = preview(lm, n, scope),
       chosen = p.id === selected;
+    const caption = graphCaption(lm,n);
     const remembered = previous.get(p.id);
     const distance = norm(p.p),
       typography = lensTypography(distance);
-    const { titleSize, detailSize, metaSize } = typography;
+    const { detailSize, metaSize } = typography;
     const weight = chosen ? 700 : 550;
-    const titleFont = `${weight} ${titleSize}px ${family}`,
-      valueFont = `${detailSize}px ${family}`,
+    const valueFont = `${detailSize}px ${family}`,
       metaFont = `${metaSize}px ${family}`;
     const brief = info.content
           .replace(/дослідження|досліджень/g, "досл.")
@@ -288,7 +314,7 @@ export function placeLabels(
     // Focus is already named in the fixed orientation bar. Do not add/remove
     // a line inside the moving label when nearest-node identity changes.
     const meta = chosen ? "Обрано" : "";
-    const widths = width < 600 ? [216, 178, 142] : [284, 238, 196];
+    const widths = width < 600 ? [224, 200, 180] : [320, 278, 236];
     const variants = remembered
       ? moving ? [remembered.variant] : [remembered.variant, ...[0, 1, 2].filter(i => i !== remembered.variant)]
       : [0, 1, 2];
@@ -296,28 +322,39 @@ export function placeLabels(
     for (const variant of variants) {
       // Typeset once in a fixed coordinate system; scale that composition.
       // No 1/2/3-line or width switch at arbitrary lens radii.
-      const scale = titleSize / 26;
-      const longestWord = Math.max(...n.title.split(/\s+/).map(word => measure(word, `700 26px ${family}`)));
+      const longestWord = Math.max(...caption.title.split(/\s+/).map(word => measure(word, `700 21px ${family}`)));
       const baseWidth = Math.min(width - 24, Math.max(widths[variant], longestWord + 8));
-      const lines = wrapText(n.title, baseWidth - 8, measure,
-        `700 26px ${family}`, n.kind === "clinical_event" ? 3 : 2);
+      let baseSize = 21;
+      let lines = wrapText(caption.title, baseWidth - 8, measure, `700 ${baseSize}px ${family}`, Infinity);
+      while (lines.length > (n.kind === "finding" ? 4 : 3) && baseSize > 15) {
+        baseSize--;
+        lines = wrapText(caption.title, baseWidth - 8, measure, `700 ${baseSize}px ${family}`, Infinity);
+      }
+      const titleSize = 11.5 + (baseSize - 11.5) * Math.max(0, 1 - distance) ** 0.8;
+      const titleFont = `${weight} ${titleSize}px ${family}`;
+      const scale = titleSize / baseSize;
       const limit = (baseWidth - 8) * scale + 8;
       const dateText =
         n.kind === "clinical_event" || n.kind === "temporal_relation"
           ? lm.times.get(n.id)!.text
           : "";
+      // Reserve for the worst relative font/width ratio at the rim. These
+      // line breaks stay fixed throughout a drag, just like the title.
+      const outerType=lensTypography(1), innerType=lensTypography(0);
+      const stableDateWidth=(baseWidth-8)*Math.min(1,(outerType.titleSize/baseSize)/(outerType.metaSize/innerType.metaSize));
+      const stableValueWidth=(baseWidth-8)*Math.min(1,(outerType.titleSize/baseSize)/(outerType.detailSize/innerType.detailSize));
       const dateLines = dateText
-        ? wrapText(dateText, limit - 8, measure, metaFont, 2)
+        ? wrapText(dateText, stableDateWidth, measure, `${innerType.metaSize}px ${family}`, Infinity)
         : [];
-      const content =
-        wrapText(brief, limit - 8, measure, valueFont, 1)[0] || "";
-      const w = Math.min(
+      const contentLines = brief ? wrapText(brief, stableValueWidth, measure, `${innerType.detailSize}px ${family}`, Infinity) : [];
+      const content = brief;
+      const w = (caption.disclosure ? 16 : 0) + Math.min(
         limit,
         Math.max(
           76,
           ...lines.map((t) => measure(t, titleFont) + 8),
           ...dateLines.map((t) => measure(t, metaFont) + 8),
-          measure(content, valueFont) + 8,
+          ...contentLines.map(t => measure(t, valueFont) + 8),
           meta ? measure(meta, metaFont) + 8 : 0,
         ),
       );
@@ -325,12 +362,12 @@ export function placeLabels(
       const metaBand = meta ? metaSize * 1.3 + 3 : 0;
       const dateLineHeight = metaSize * 1.25,
         dateBand = dateLines.length ? dateLines.length * dateLineHeight + 3 : 0;
+      const detailLineHeight = detailSize * 1.25;
       const inkHeight =
         metaBand +
         lines.length * titleLineHeight +
         dateBand +
-        detailSize * 1.25 +
-        3;
+        (contentLines.length ? contentLines.length * detailLineHeight + 3 : 0);
       const h = Math.max(44, inkHeight + 6),
         top = (h - inkHeight) / 2;
       const metaY = top + metaSize,
@@ -425,6 +462,10 @@ export function placeLabels(
         dateY,
         dateLineHeight,
         ...typography,
+        titleSize,
+        contentLines,
+        detailLineHeight,
+        disclosure: caption.disclosure,
         titleLineHeight,
         titleY,
         detailY,

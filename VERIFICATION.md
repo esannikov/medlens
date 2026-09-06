@@ -28,3 +28,15 @@ Fix: remembered angular anchors, bounded 24px relative adjustment, stable typese
 - Independent pre-publication review found a separate pointerup reflow: an already visible secondary label moved 155.58px on unchanged geometry. Motion-only feedback no longer invalidates label placement; a regression guards the memo dependency contract. This functional lifecycle repair does not add a new visual-polish round.
 
 Residual: dense crossings can briefly hide the moving caption to preserve node readability. Its exact text remains available in the fixed focus header and reader. This was disclosed to the user; additional visual polishing was stopped after the two inspection rounds required by Impeccable.
+
+## Complete captions and explicit focus — 2026-09-06
+
+Fixed oversized truncated labels by changing their base composition, not only the final SVG font size. Type now ranges from 11.5 to 21px, with full-title fitting for long names. Finding boilerplate and its empty detail band were removed. Textual values and dates wrap with stable line breaks. A distinct fixed optical ring, light rim and four subtle ticks identify the magnification area.
+
+Short findings (including negation and question marks) remain verbatim. Long prose is never cropped into an apparent clinical conclusion: a source-defined section heading or neutral structured-type caption links to the unchanged full reader. Sentence punctuation disqualifies a colon prefix from becoming a heading. Visible captions are included in accessible button names, and the disclosure arrow is inside its hit/collision rectangle.
+
+Independent typography review identified and closed four issues: non-clickable arrow, missing visible alias in accessible name, narrative colon-prefix extraction, and dynamic detail rewrapping. No dependency or clinical-data changes.
+
+`npm test` and build PASS: 5,334 labels checked across 756 layouts, 178 motion checks, complete visible navigation titles and values. Browser checked all 16 study titles, all full and uncut; one 540-character narrative matched its source exactly. Desktop and mobile screenshots were inspected; no page error or horizontal overflow. Mechanical detector on the four changed UI files returned `[]`. Final full-finding tour and deployment canary are recorded separately in local QA evidence.
+
+Final browser tour opened all 38 findings, checked each complete reader text against the public payload, and dragged from every finding. No ellipsis or source-boilerplate string was found in the sampled graph labels. The actual disclosure-arrow pixel opened the matching full record. Time controls and the 185-row table were rechecked; overview/mobile screenshots inspected. Two test-selector typos interrupted only the post-tour script tail (wrong ARIA role and wrong spelling of the return button); the corrected tail completed, without production changes for those harness errors. Clinical data SHA-256 remains unchanged.

@@ -493,7 +493,8 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: space-between;
   padding: 8px 18px;
-  min-height: 43px;
+  height: 72px;
+  flex-shrink: 0;
   font-size: 12px;
 }
 .lens-orientation > div {
@@ -517,9 +518,8 @@ input[type="checkbox"] {
   min-width: 0;
 }
 .focus-caption-text strong {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.3;
   color: var(--ink);
 }
 .focus-caption-text > span {
@@ -578,10 +578,7 @@ input[type="checkbox"] {
   margin-bottom: 4px;
 }
 .lens-peek span > span {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+  display: block;
   line-height: 1.45;
 }
 .lens-zoom .return-focus {

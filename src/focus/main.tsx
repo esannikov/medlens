@@ -705,8 +705,7 @@ function NodeRow({
       <span>
         <strong>{n.title}</strong>
         <small>
-          {nodeKinds[n.kind]} ·{" "}
-          {eligible ? preview(lm, n, scope).content : "Поза відбором"}
+          {[nodeKinds[n.kind], eligible ? preview(lm, n, scope).content : "Поза відбором"].filter(Boolean).join(" · ")}
           {(lm.times.get(n.id)?.day ||
             n.kind === "clinical_event" ||
             n.kind === "temporal_relation") &&

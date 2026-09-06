@@ -10,6 +10,7 @@ import {
 } from "./model.ts";
 import {
   lensGeometry,
+  graphCaption,
   nodeKinds,
   placeLabels,
   preview,
@@ -153,9 +154,9 @@ export function Lens({
         <div data-focus-caption={centerId}>
           <NodeGlyph kind={focusNode.kind} color={focusNode.color} />
           <span className="focus-caption-text">
-            <strong title={focusNode.title}>У фокусі: {focusNode.title}</strong>
+            <strong title={focusNode.title}>У фокусі: {focusNode.kind === "finding" ? "Знахідка" : graphCaption(lm,focusNode).title}</strong>
             <span>
-              {info.kind} · {info.content}
+              {[info.kind, info.content].filter(Boolean).join(" · ")}
               {info.time ? ` · ${info.time}` : ""}
             </span>
           </span>
@@ -226,9 +227,9 @@ export function Lens({
             </radialGradient>
             <radialGradient id={`${volumeId}-focus`}>
               <stop offset="0%" stopColor="#9983c4" stopOpacity="0.025" />
-              <stop offset="50%" stopColor="#9983c4" stopOpacity="0.055" />
-              <stop offset="70%" stopColor="#9983c4" stopOpacity="0.095" />
-              <stop offset="85%" stopColor="#9983c4" stopOpacity="0.035" />
+              <stop offset="50%" stopColor="#9983c4" stopOpacity="0.06" />
+              <stop offset="78%" stopColor="#9983c4" stopOpacity="0.13" />
+              <stop offset="88%" stopColor="#9983c4" stopOpacity="0.045" />
               <stop offset="100%" stopColor="#9983c4" stopOpacity="0" />
             </radialGradient>
           </defs>
@@ -253,11 +254,22 @@ export function Lens({
             data-focus-zone="true"
             cx={size.width / 2}
             cy={size.height / 2}
-            r={radius * 0.62}
+            r={radius * 0.56}
             fill={`url(#${volumeId}-focus)`}
             pointerEvents="none"
             aria-hidden="true"
           />
+          <g data-focus-ring="true" fill="none" pointerEvents="none" aria-hidden="true">
+            <circle cx={size.width / 2} cy={size.height / 2} r={radius * 0.48}
+              stroke="#9280af" strokeWidth="0.9" opacity="0.46" />
+            <circle cx={size.width / 2 - 0.5} cy={size.height / 2 - 1} r={radius * 0.48 - 1}
+              stroke="#ffffff" strokeWidth="1.2" opacity="0.75" />
+            {[0,1,2,3].map(i => {
+              const angle = i * Math.PI / 2, r = radius * 0.48;
+              return <path key={i} d={`M${size.width/2 + Math.cos(angle)*(r+3)} ${size.height/2 + Math.sin(angle)*(r+3)}l${Math.cos(angle)*5} ${Math.sin(angle)*5}`}
+                stroke="#9280af" strokeWidth="1.1" opacity="0.55" />;
+            })}
+          </g>
           <g fill="none">
             {paths.map((path) => {
               const both =
@@ -370,13 +382,14 @@ export function Lens({
                   data-label-for={b.id}
                   data-label-distance={b.distance}
                   data-label-anchor={b.anchor}
+                  data-label-disclosure={b.disclosure}
                   opacity={b.opacity}
-                  aria-label={`${content.kind}: ${n.title}. ${content.content}. ${content.time}. ${content.action}`}
-                  onClick={() => choose(b.id)}
+                  aria-label={`${content.kind}: ${b.lines.join(" ")}. ${content.content}. ${content.time}. ${b.disclosure ? "Розгорнути повний опис" : content.action}`}
+                  onClick={() => b.disclosure && !drag.current?.moved ? onRead(b.id) : choose(b.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      if (b.id === selected) onRead(b.id);
+                      if (b.id === selected || b.disclosure) onRead(b.id);
                       else onSelect(b.id);
                     }
                   }}
@@ -437,14 +450,16 @@ export function Lens({
                       ))}
                     </text>
                   )}
-                  <text
+                  {b.contentLines.length > 0 && <text
                     x={b.x + 4}
                     y={b.y + b.detailY}
                     fontSize={b.detailSize}
                     fill={n.color}
                   >
-                    {b.content}
-                  </text>
+                    {b.contentLines.map((line,i) => <tspan key={i} x={b.x+4} dy={i ? b.detailLineHeight : 0}>{line}</tspan>)}
+                  </text>}
+                  {b.disclosure && <path data-disclosure-arrow={b.id} d={`M${b.x+b.w-11} ${b.y+b.titleY-8}l4 4-4 4`}
+                    fill="none" stroke={n.color} strokeWidth="1.3" aria-hidden="true" pointerEvents="none" />}
                 </g>
               );
             })}
@@ -458,7 +473,7 @@ export function Lens({
                 {nodeKinds[hoverNode.kind]} ·{" "}
                 {preview(lm, hoverNode, scope).action}
               </strong>
-              <span>{hoverNode.title}</span>
+              <span>{graphCaption(lm,hoverNode).title}</span>
             </span>
           </div>
         )}
@@ -495,6 +510,7 @@ export function Lens({
         <span className="lens-key-context">
           Дрібні точки — згорнутий контекст
         </span>
+        <span className="lens-key-context"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="#eee8f6" stroke="#9280af" /></svg>Коло в центрі — зона збільшення</span>
       </div>
     </section>
   );

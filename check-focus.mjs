@@ -8,6 +8,7 @@ import {
   preview,
   wrapText,
   lensTypography,
+  graphCaption,
 } from "./src/focus/layout.ts";
 import {
   createLensModel,
@@ -110,6 +111,23 @@ const measure = (text, font = "12.5px") =>
     0,
   ) *
   (Number(font.match(/([\d.]+)px/)?.[1] || 12.5) / 12.5);
+assert(lm.order.filter(n => n.kind === "finding").every(n => preview(lm,n,all).content === ""),
+  "Finding labels must not repeat source boilerplate");
+const longStudy = lm.order.find(n => n.kind === "clinical_event" && n.title.startsWith("Патоморфологічне"));
+const studyGeometry = lensGeometry(lm,longStudy.id,all,longStudy.p2,1440,800);
+const studyLabel = placeLabels(lm,longStudy.id,all,studyGeometry.points,studyGeometry.paths,1440,800,measure)
+  .find(b => b.id === longStudy.id);
+assert.equal(studyLabel?.lines.join(" "),longStudy.title,"The large central study title must be complete");
+for (const n of lm.order) {
+  const caption=graphCaption(lm,n);
+  assert(!caption.title.includes("…"), "Navigation captions must not be clipped clinical assertions");
+  if (!caption.disclosure) assert.equal(caption.title,n.title);
+  else assert(n.title.length > 110, "Short clinical statements must stay verbatim, including uncertainty");
+}
+for (const n of lm.order.filter(n => n.kind === "finding" && n.title.length <= 110))
+  assert.equal(graphCaption(lm,n).title,n.title, "Do not lose negation or question marks");
+const narrativeHeading=lm.order.find(n=>n.title.startsWith("Анаплазовані клітини не виявлені. Заключення:"));
+assert(!graphCaption(lm,narrativeHeading).title.includes("Заключення"), "A narrative sentence is not a navigation heading");
 // Reproduce the reported circular drag: previously the same title teleported
 // 140–280px between the eight independent placement slots.
 let motionChecks = 0;
@@ -154,7 +172,7 @@ for (let i = 1; i <= 100; i++) {
       lensTypography((i - 1) / 100).detailSize,
   );
 }
-assert.equal(lensTypography(0).titleSize, 26);
+assert.equal(lensTypography(0).titleSize, 21);
 assert.equal(lensTypography(1).titleSize, 11.5);
 for (const [width, height] of [
   [1440, 646],
@@ -209,6 +227,11 @@ for (const [width, height] of [
       captionFallbacks++;
     }
     for (const b of boxes) {
+      assert.equal(b.lines.join(" "),graphCaption(lm,lm.nodes.get(b.id)).title.replace(/\s+/g," "),
+        "Every displayed label is complete navigation text");
+      assert.equal(b.contentLines.join(" "),b.content.replace(/\s+/g," "), "Displayed values must not be ellipsized");
+      for(const line of b.contentLines)
+        assert(measure(line,`${b.detailSize}px`) <= b.w-8+1e-6,"Full value fits at every lens distance");
       assert(b.h >= 44);
       for (const other of boxes)
         if (other.id !== b.id) assert(!overlaps(b, other), "Label collision");
