@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { approvedInputs, verifyInput } from './approved-inputs.mjs';
+const root = new URL('../', import.meta.url);
+const bytes = readFileSync(new URL('public/data/case024.json', root));
+const data = JSON.parse(bytes), manifest = JSON.parse(readFileSync(new URL('public/data/publication.json', root)));
+assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.projection_sha256);
+assert.equal(data.graph_hash, manifest.patient_graph_sha256);
+assert.equal(manifest.source_graph_file_sha256, approvedInputs.graph);
+assert.equal(manifest.source_package_sha256, approvedInputs.publicPackage);
+verifyInput(bytes, manifest.projection_sha256);
+const changed = structuredClone(data);
+changed.objects.find(o => typeof o.payload.value?.number === 'number').payload.value.number += 1;
+assert.throws(() => verifyInput(JSON.stringify(changed), manifest.projection_sha256), /Input bytes differ/);
+assert.throws(() => verifyInput(bytes, approvedInputs.graph), /Input bytes differ/);
+assert.equal(data.case_id, manifest.case_id);
+assert.equal(data.objects.length, manifest.objects);
+assert.equal(data.edges.length, manifest.structural_edges);
+assert.equal(data.clinician_accepted, false);
+assert.equal(data.graph_only, true);
+assert.equal(manifest.external_publication_authorized, true);
+assert.equal(data.hypotheses.length + data.relations.length, 0);
+assert(!/\/Users\/|["\s]\.local\/|file:\/\/|session=|localhost|127\.0\.0\.1|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(bytes.toString()));
+const ids = new Set(data.objects.map(o => o.object_id));
+for (const e of data.edges) assert(ids.has(e.source) && ids.has(e.target));
+const sources = new Set(data.sources.map(s => s.id));
+for (const o of data.objects) for (const s of o.provenance.source_record_ids || []) assert(sources.has(s));
+const walk = dir => readdirSync(dir, {withFileTypes:true}).flatMap(e => e.isDirectory() ? walk(new URL(`${e.name}/`,dir)) : [new URL(e.name,dir)]);
+for (const file of walk(new URL('src/',root))) {
+  const code = readFileSync(file,'utf8');
+  assert(!/\/api\/|localhost|127\.0\.0\.1|session=|dangerouslySetInnerHTML|eval\(/.test(code), `Private or unsafe dependency: ${file.pathname.split('/').at(-1)}`);
+}
+assert(!/https?:/.test(readFileSync(new URL('src/focus/style.css',root),'utf8')), 'No external styles or fonts');
+console.log('Publication: PASS — pinned public data, complete references, no local API or private paths');

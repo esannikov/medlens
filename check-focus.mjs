@@ -1,0 +1,308 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import {
+  lensGeometry,
+  placeLabels,
+  overlaps,
+  crosses,
+  preview,
+  wrapText,
+  lensTypography,
+} from "./src/focus/layout.ts";
+import {
+  createLensModel,
+  focusPoint,
+  geodesic,
+  norm,
+  compareScopes,
+} from "./src/focus/model.ts";
+const data = JSON.parse(
+  readFileSync(new URL("./public/data/case024.json", import.meta.url), "utf8"),
+);
+const frozen = JSON.stringify(data),
+  lm = createLensModel(data),
+  all = { cutoff: null, undated: true, group: null };
+assert.equal(lm.order.filter((n) => n.object).length, data.objects.length);
+assert.equal(lm.order.filter((n) => n.object).length, 185);
+assert.equal(lm.count(lm.root, all).visibleResults, 148);
+assert.equal(new Set(lm.order.map((n) => n.id)).size, lm.order.length);
+let mathChecks = 0;
+for (const n of lm.order) {
+  assert.equal(lm.ancestors(n.id).at(-1).id, n.id);
+  if (n.parent) assert.equal(lm.nodes.get(n.parent).depth + 1, n.depth);
+  if (n.object)
+    assert.strictEqual(
+      n.object,
+      data.objects.find((o) => o.object_id === n.id),
+    );
+  for (const key of ["p2"]) {
+    assert(norm(n[key]) < 1);
+    assert(norm(focusPoint(n[key], n[key])) < 1e-7);
+    for (const p of lm.order) {
+      const mapped = focusPoint(p[key], n[key]);
+      assert(mapped.every(Number.isFinite));
+      assert(norm(mapped) < 1 + 1e-9);
+      const original = focusPoint(
+        mapped,
+        n[key].map((v) => -v),
+      );
+      assert(norm(original.map((v, i) => v - p[key][i])) < 1e-7);
+      mathChecks++;
+    }
+  }
+}
+for (const e of lm.displayEdges) {
+  const a = lm.nodes.get(e.source),
+    b = lm.nodes.get(e.target);
+  for (const key of ["p2"]) {
+    const path = geodesic(a[key], b[key]);
+    assert(norm(path[0].map((v, i) => v - a[key][i])) < 1e-7);
+    assert(norm(path.at(-1).map((v, i) => v - b[key][i])) < 1e-7);
+    assert(path.every((p) => p.every(Number.isFinite) && norm(p) < 1));
+  }
+  if (!e.grouping)
+    assert(
+      data.edges.some((x) => x.source === e.source && x.target === e.target),
+    );
+}
+const first = { ...all, cutoff: lm.days[0] },
+  last = { ...all, cutoff: lm.days.at(-1) };
+assert.equal(compareScopes(lm, first, last).onlyA.length, 0);
+for (const n of lm.order.filter((n) => n.object && n.kind !== "patient")) {
+  const t = lm.times.get(n.id);
+  if (t.basis === "unknown") {
+    assert(lm.eligible(n.id, first));
+    assert(!lm.eligible(n.id, { ...all, undated: false }));
+  }
+  if (t.basis === "study") {
+    assert.equal(n.object.clinical_time.start, null);
+    assert.equal(t.day, lm.eventFor(n).clinical_time.start);
+  }
+  if (t.day && t.day > first.cutoff) assert(!lm.eligible(n.id, first));
+}
+const administrativeOnly = lm.m.events.filter(
+  (e) =>
+    e.clinical_time.start === null &&
+    e.payload.times?.some((t) => t.kind === "issued"),
+);
+assert(administrativeOnly.length > 0);
+assert(
+  administrativeOnly.every(
+    (e) => lm.times.get(e.object_id).basis === "unknown",
+  ),
+);
+const lab = { ...all, group: "group:laboratory_panel" };
+assert(
+  lm.order
+    .filter((n) => n.kind === "clinical_event" && lm.eligible(n.id, lab))
+    .every((n) => n.object.payload.event_kind === "laboratory_panel"),
+);
+assert.equal(lm.eligible("group:imaging_study", lab), false);
+assert.equal(JSON.stringify(data), frozen);
+let layoutChecks = 0,
+  labelsChecked = 0,
+  captionFallbacks = 0,
+  navigationChecks = 0;
+// Conservative deterministic metrics; browser QA independently uses actual rendered fonts.
+const measure = (text, font = "12.5px") =>
+  Array.from(text).reduce(
+    (sum, char) => sum + (/\s/.test(char) ? 4 : /[МШЩЖW]/.test(char) ? 11 : 7),
+    0,
+  ) *
+  (Number(font.match(/([\d.]+)px/)?.[1] || 12.5) / 12.5);
+for (let i = 1; i <= 100; i++) {
+  assert(
+    lensTypography(i / 100).titleSize < lensTypography((i - 1) / 100).titleSize,
+  );
+  assert(
+    lensTypography(i / 100).detailSize <
+      lensTypography((i - 1) / 100).detailSize,
+  );
+}
+assert.equal(lensTypography(0).titleSize, 21);
+assert.equal(lensTypography(1).titleSize, 11.5);
+for (const [width, height] of [
+  [1440, 646],
+  [1280, 616],
+  [729, 616],
+  [390, 459],
+]) {
+  for (const n of lm.order) {
+    const g = lensGeometry(lm, n.id, all, n.p2, width, height);
+    assert.equal(
+      g.paths.length,
+      lm.displayEdges.length,
+      "Peripheral connections must not be culled",
+    );
+    assert(
+      g.points.every((p) => p.radius >= 3.8),
+      "Peripheral marks must remain visible",
+    );
+    assert(
+      g.points.every(
+        (p) => p.id === lm.root || g.paths.some((e) => e.target === p.id),
+      ),
+      "Every non-root node has a connection",
+    );
+    const browsing = lensGeometry(lm, lm.root, all, n.p2, width, height);
+    assert.equal(
+      browsing.centerId,
+      n.id,
+      "Geometric focus must not stay on the last clicked node",
+    );
+    assert.equal(browsing.ctx.node.id, n.id, "Context follows the moving lens");
+    navigationChecks++;
+    const boxes = placeLabels(
+      lm,
+      n.id,
+      all,
+      g.points,
+      g.paths,
+      width,
+      height,
+      measure,
+    );
+    if (!boxes.some((b) => b.id === n.id)) {
+      // A persistent exact-title focus caption is always visible. At tightly
+      // clustered positions do not force a body over another clinical record.
+      const point = g.points.find((p) => p.id === n.id);
+      assert(
+        Math.abs(point.x - width / 2) < 1e-5 &&
+          Math.abs(point.y - height / 2) < 1e-5,
+      );
+      assert(n.title.trim().length > 0);
+      captionFallbacks++;
+    }
+    for (const b of boxes) {
+      assert(b.h >= 44);
+      for (const other of boxes)
+        if (other.id !== b.id) assert(!overlaps(b, other), "Label collision");
+      const anchor = g.points.find((p) => p.id === b.id);
+      const separation = Math.hypot(
+        Math.max(b.x - anchor.x, 0, anchor.x - b.x - b.w),
+        Math.max(b.y - anchor.y, 0, anchor.y - b.y - b.h),
+      );
+      assert(
+        separation <= (anchor.radius + 12) * Math.SQRT2 + 1e-6,
+        "Text must remain beside its node",
+      );
+      for (const p of g.points)
+        assert(
+          !overlaps(b, {
+            x: p.x - p.radius,
+            y: p.y - p.radius,
+            w: p.radius * 2,
+            h: p.radius * 2,
+          }),
+          "Text covers a node",
+        );
+      for (const path of g.paths) {
+        if (path.source === b.id || path.target === b.id) continue;
+        const points = path.points;
+        const inner = {
+          x: b.x + 0.02,
+          y: b.y + 0.02,
+          w: b.w - 0.04,
+          h: b.h - 0.04,
+        };
+        for (let i = 1; i < points.length; i++)
+          assert(
+            !crosses(inner, points[i - 1], points[i]),
+            "Unrelated connection crosses text",
+          );
+      }
+      assert(
+        b.lines.every(
+          (line) =>
+            measure(line, `${b.weight} ${b.titleSize}px`) <= b.w - 8 + 1e-9,
+        ),
+        `Wrapped title exceeds box ${b.id}: ${Math.max(...b.lines.map((line) => measure(line, `${b.weight} ${b.titleSize}px`))) - (b.w - 8)}px`,
+      );
+      if (
+        ["clinical_event", "temporal_relation"].includes(
+          lm.nodes.get(b.id).kind,
+        )
+      )
+        assert(
+          b.dateLines.length > 0,
+          "Study/comparison date must be labelled",
+        );
+      labelsChecked++;
+    }
+    layoutChecks++;
+  }
+}
+const longWord = "М".repeat(90);
+for (const t of lm.m.temporal) {
+  const current = lm.m.byId.get(t.payload.current.object_id);
+  assert.equal(
+    lm.nodes.get(t.object_id).title,
+    current.payload.details.replace(/^ВИСНОВОК:\s*/iu, ""),
+  );
+  assert.equal(lm.times.get(t.object_id).basis, "comparison");
+  assert(
+    !lm.eligible(t.object_id, {
+      ...all,
+      cutoff: t.payload.prior.clinical_time,
+    }),
+    "A later comparison must not appear at the earlier endpoint date",
+  );
+  assert(
+    lm.eligible(t.object_id, {
+      ...all,
+      cutoff: t.payload.current.clinical_time,
+    }),
+  );
+}
+assert.equal(
+  new Set(lm.m.temporal.map((t) => lm.nodes.get(t.object_id).title)).size,
+  lm.m.temporal.length,
+  "Comparison captions identify different subjects",
+);
+assert(wrapText(longWord, 120, measure).every((line) => measure(line) <= 120));
+for (const file of ["Lens.tsx", "model.ts", "main.tsx", "layout.ts"]) {
+  const source = readFileSync(
+    new URL(`./src/focus/${file}`, import.meta.url),
+    "utf8",
+  );
+  assert(
+    !/Canvas3D|\bp3\b|from ["']three["']|Лінза 3D/.test(source),
+    `Removed lens code remains in ${file}`,
+  );
+}
+assert(
+  !readFileSync(
+    new URL("./src/focus/Lens.tsx", import.meta.url),
+    "utf8",
+  ).includes("<line "),
+  "Leader lines must not return",
+);
+assert.match(
+  readFileSync(new URL("./src/focus/main.tsx", import.meta.url), "utf8"),
+  /choose\(\s*mode === "table" \? selected : navigationId\s*\);\s*setRailTab\("links"\)/,
+  "Focus-links action must choose the navigation focus before opening links",
+);
+for (const n of lm.order.filter(
+  (n) => n.kind === "clinical_event" || n.kind === "specimen",
+))
+  assert(
+    preview(lm, n, first).content.includes(
+      String(lm.count(n.id, first).visibleResults),
+    ),
+  );
+console.log(
+  JSON.stringify({
+    status: "PASS",
+    objects: data.objects.length,
+    results: 148,
+    clinicalDays: lm.days.length,
+    navigationGroups: lm.order.filter((n) => !n.object).length,
+    mathChecks,
+    layoutChecks,
+    labelsChecked,
+    captionFallbacks,
+    navigationChecks,
+    scope:
+      "2D focus navigation; complete thin connections; unboxed adjacent text without node/foreign-edge overlaps; radial font scale; dates and comparison endpoints; no clinical mutation",
+  }),
+);
