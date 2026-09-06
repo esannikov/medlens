@@ -338,9 +338,19 @@ input[type="checkbox"] {
   touch-action: none;
   user-select: none;
 }
+.focus-tint { transition: stop-color 220ms ease-out; }
+.lens-connection { transition: stroke-width 140ms ease-out, opacity 160ms ease-out; }
+.lens-glint { opacity: 0; transform-box: view-box; transform-origin: 50% 50%; }
+.lens-zoom select { min-height: 34px; max-width: 160px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--muted); font: inherit; font-size: 11px; padding: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  .lens-glint { display: none; }
+  .focus-tint, .lens-connection { transition: none; }
+}
 .node-target {
   cursor: pointer;
 }
+.node-target:focus { outline: none; }
+.node-target:focus-visible > circle:first-child { stroke: var(--purple); stroke-width: 1.5; }
 .lens-label {
   cursor: pointer;
 }

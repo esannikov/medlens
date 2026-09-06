@@ -11,6 +11,9 @@ import {
 import {
   lensGeometry,
   graphCaption,
+  connectionStyle,
+  lineProfiles,
+  type LineProfile,
   nodeKinds,
   placeLabels,
   preview,
@@ -45,6 +48,9 @@ export function Lens({
     frame = useRef(0);
   const volumeId = `lens-volume-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const labelMemory = useRef(new Map<string, Label>());
+  const glint = useRef<SVGGElement>(null);
+  const glintAnimation = useRef<Animation | null>(null);
+  const [lineProfile, setLineProfile] = useState<LineProfile>("balanced");
   const [size, setSize] = useState({ width: 800, height: 500 });
   const [focus, setFocus] = useState<Vec>(() => lm.nodes.get(selected)!.p2),
     currentFocus = useRef(focus);
@@ -121,10 +127,12 @@ export function Lens({
     // last rendered placement rather than start a second, unlocked layout.
     [lm, selected, scope, points, paths, size, measure],
   );
+  // Reset before committing the new layout, not in a later passive effect.
+  // Otherwise closing the reader erases the anchors needed by the first drag.
+  useLayoutEffect(() => { labelMemory.current.clear(); }, [lm, size.width, size.height, scope]);
   useLayoutEffect(() => {
     labels.forEach(label => labelMemory.current.set(label.id, label));
   }, [labels]);
-  useEffect(() => { labelMemory.current.clear(); }, [lm, size.width, size.height, scope]);
   useEffect(() => onFocusChange(centerId), [centerId, onFocusChange]);
   const hoverNode = hovered ? lm.nodes.get(hovered) : null;
   const focusNode = lm.nodes.get(centerId)!,
@@ -134,6 +142,32 @@ export function Lens({
   const highlighted = new Set(
     lm.ancestors(hovered || centerId).map((n) => n.id),
   );
+  const branchRoot = focusNode.children.length ? focusNode : lm.nodes.get(focusNode.parent || centerId)!;
+  const branch = new Set(branchRoot.id === lm.root
+    ? [lm.root, ...branchRoot.children] : [branchRoot.id, ...branchRoot.descendants]);
+  const pointsById = new Map(points.map(p => [p.id,p]));
+  const paintedPaths = paths.map(path => {
+    const from=pointsById.get(path.source)!, to=pointsById.get(path.target)!;
+    const role = from.active && to.active && highlighted.has(path.source) && highlighted.has(path.target)
+      ? "route" : from.active && to.active && branch.has(path.source) && branch.has(path.target) ? "branch" : "context";
+    return {...path, role, ...connectionStyle(1-Math.min(norm(from.p),norm(to.p)),role,lineProfile),
+      d:path.points.map(([x,y],i)=>`${i ? "L" : "M"}${x},${y}`).join(" ")};
+  });
+  const playGlint = () => {
+    if (!glint.current || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    glintAnimation.current?.cancel();
+    glintAnimation.current=glint.current.animate([
+      {transform:"rotate(-16deg)",opacity:0},
+      {transform:"rotate(-4deg)",opacity:0.9,offset:0.25},
+      {transform:"rotate(22deg)",opacity:0},
+    ],{duration:650,easing:"cubic-bezier(0.16,1,0.3,1)",fill:"none"});
+  };
+  useEffect(() => {
+    const stop=()=>glintAnimation.current?.cancel();
+    const visibility=()=>{if(document.hidden)stop();};
+    document.addEventListener("visibilitychange",visibility);
+    return ()=>{stop();document.removeEventListener("visibilitychange",visibility);};
+  },[]);
   const choose = (id: string) => {
     if (!drag.current?.moved) {
       if (id === selected) onRead(id);
@@ -184,8 +218,10 @@ export function Lens({
           onPointerMove={(e) => {
             const d = drag.current;
             if (!d || !e.buttons) return;
-            if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5)
+            if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) {
               d.moved = true;
+              playGlint();
+            }
             if (d.moved) {
               setMoving(true);
               setHovered(null);
@@ -226,12 +262,14 @@ export function Lens({
               <stop offset="100%" stopColor="#857398" stopOpacity="0.055" />
             </radialGradient>
             <radialGradient id={`${volumeId}-focus`}>
-              <stop offset="0%" stopColor="#9983c4" stopOpacity="0.025" />
-              <stop offset="50%" stopColor="#9983c4" stopOpacity="0.06" />
-              <stop offset="78%" stopColor="#9983c4" stopOpacity="0.13" />
-              <stop offset="88%" stopColor="#9983c4" stopOpacity="0.045" />
-              <stop offset="100%" stopColor="#9983c4" stopOpacity="0" />
+              <stop className="focus-tint" offset="0%" stopColor={focusNode.color} stopOpacity="0.015" />
+              <stop className="focus-tint" offset="50%" stopColor={focusNode.color} stopOpacity="0.035" />
+              <stop className="focus-tint" offset="78%" stopColor={focusNode.color} stopOpacity="0.085" />
+              <stop className="focus-tint" offset="88%" stopColor={focusNode.color} stopOpacity="0.025" />
+              <stop className="focus-tint" offset="100%" stopColor={focusNode.color} stopOpacity="0" />
             </radialGradient>
+            <linearGradient id={`${volumeId}-gleam`}><stop offset="0" stopColor="#fff" stopOpacity="0"/><stop offset="0.48" stopColor="#fff"/><stop offset="1" stopColor="#fff" stopOpacity="0"/></linearGradient>
+            <filter id={`${volumeId}-glow`} filterUnits="userSpaceOnUse" x="0" y="0" width={size.width} height={size.height}><feGaussianBlur stdDeviation="1.4"/></filter>
           </defs>
           <circle
             className="lens-boundary"
@@ -262,7 +300,7 @@ export function Lens({
           <g data-focus-ring="true" fill="none" pointerEvents="none" aria-hidden="true">
             <circle cx={size.width / 2} cy={size.height / 2} r={radius * 0.48}
               stroke="#9280af" strokeWidth="0.9" opacity="0.46" />
-            <circle cx={size.width / 2 - 0.5} cy={size.height / 2 - 1} r={radius * 0.48 - 1}
+            <circle cx={size.width / 2 - 0.5} cy={size.height / 2 - 1} r={Math.max(0, radius * 0.48 - 1)}
               stroke="#ffffff" strokeWidth="1.2" opacity="0.75" />
             {[0,1,2,3].map(i => {
               const angle = i * Math.PI / 2, r = radius * 0.48;
@@ -270,20 +308,27 @@ export function Lens({
                 stroke="#9280af" strokeWidth="1.1" opacity="0.55" />;
             })}
           </g>
+          <g ref={glint} data-lens-glint="true" className="lens-glint" fill="none" pointerEvents="none" aria-hidden="true">
+            <path d={`M${size.width/2-radius*.48*.7071} ${size.height/2-radius*.48*.7071}A${radius*.48} ${radius*.48} 0 0 1 ${size.width/2+radius*.48*.7071} ${size.height/2-radius*.48*.7071}`}
+              stroke={`url(#${volumeId}-gleam)`} strokeWidth="3.5" strokeLinecap="round" />
+          </g>
+          <g fill="none" filter={`url(#${volumeId}-glow)`} pointerEvents="none" aria-hidden="true">
+            {paintedPaths.filter(p=>p.role!=="context").map(path=><path key={path.target} d={path.d} stroke={lm.nodes.get(path.target)!.color}
+              strokeWidth={path.width+3} opacity={path.opacity*0.09} />)}
+          </g>
           <g fill="none">
-            {paths.map((path) => {
-              const both =
-                highlighted.has(path.source) && highlighted.has(path.target);
+            {paintedPaths.map((path) => {
               return (
                 <path
                   key={path.target}
                   data-graph-edge={path.target}
-                  d={path.points
-                    .map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`)
-                    .join(" ")}
+                  data-edge-role={path.role}
+                  className="lens-connection"
+                  d={path.d}
                   stroke={lm.nodes.get(path.target)!.color}
-                  strokeWidth={both ? 1.35 : path.local ? 0.85 : 0.65}
-                  opacity={both ? 0.8 : path.local ? 0.43 : 0.28}
+                  strokeWidth={path.width}
+                  opacity={path.opacity}
+                  strokeLinecap="round"
                   strokeDasharray={path.grouping ? "3 4" : undefined}
                 />
               );
@@ -337,6 +382,7 @@ export function Lens({
                     data-node-mark="true"
                     opacity={p.active ? (expanded ? 1 : 0.68) : 0.14}
                   >
+                    {p.active && (branch.has(p.id) || highlighted.has(p.id)) && expanded && <circle r={p.radius+3.5} fill={n.color} opacity="0.09" />}
                     {expanded ? (
                       <NodeShape
                         kind={n.kind}
@@ -383,6 +429,7 @@ export function Lens({
                   data-label-distance={b.distance}
                   data-label-anchor={b.anchor}
                   data-label-disclosure={b.disclosure}
+                  textAnchor={b.textAnchor}
                   opacity={b.opacity}
                   aria-label={`${content.kind}: ${b.lines.join(" ")}. ${content.content}. ${content.time}. ${b.disclosure ? "Розгорнути повний опис" : content.action}`}
                   onClick={() => b.disclosure && !drag.current?.moved ? onRead(b.id) : choose(b.id)}
@@ -393,7 +440,7 @@ export function Lens({
                       else onSelect(b.id);
                     }
                   }}
-                  onMouseEnter={() => setHovered(b.id)}
+                  onMouseEnter={() => !moving && setHovered(b.id)}
                   onMouseLeave={() => setHovered(null)}
                   onFocus={() => setHovered(b.id)}
                   onBlur={() => setHovered(null)}
@@ -409,7 +456,7 @@ export function Lens({
                   />
                   {b.meta && (
                     <text
-                      x={b.x + 4}
+                      x={b.textX}
                       y={b.y + b.metaY}
                       fontSize={b.metaSize}
                       fill="#716878"
@@ -418,7 +465,7 @@ export function Lens({
                     </text>
                   )}
                   <text
-                    x={b.x + 4}
+                    x={b.textX}
                     y={b.y + b.titleY}
                     fontSize={b.titleSize}
                     fontWeight={b.weight}
@@ -426,7 +473,7 @@ export function Lens({
                     fill="#302b39"
                   >
                     {b.lines.map((line, i) => (
-                      <tspan key={i} x={b.x + 4} dy={i ? b.titleLineHeight : 0}>
+                      <tspan key={i} x={b.textX} dy={i ? b.titleLineHeight : 0}>
                         {line}
                       </tspan>
                     ))}
@@ -434,7 +481,7 @@ export function Lens({
                   {b.dateLines.length > 0 && (
                     <text
                       className="lens-date"
-                      x={b.x + 4}
+                      x={b.textX}
                       y={b.y + b.dateY}
                       fontSize={b.metaSize}
                       fill="#655c70"
@@ -442,7 +489,7 @@ export function Lens({
                       {b.dateLines.map((line, i) => (
                         <tspan
                           key={i}
-                          x={b.x + 4}
+                          x={b.textX}
                           dy={i ? b.dateLineHeight : 0}
                         >
                           {line}
@@ -451,12 +498,12 @@ export function Lens({
                     </text>
                   )}
                   {b.contentLines.length > 0 && <text
-                    x={b.x + 4}
+                    x={b.textX}
                     y={b.y + b.detailY}
                     fontSize={b.detailSize}
                     fill={n.color}
                   >
-                    {b.contentLines.map((line,i) => <tspan key={i} x={b.x+4} dy={i ? b.detailLineHeight : 0}>{line}</tspan>)}
+                    {b.contentLines.map((line,i) => <tspan key={i} x={b.textX} dy={i ? b.detailLineHeight : 0}>{line}</tspan>)}
                   </text>}
                   {b.disclosure && <path data-disclosure-arrow={b.id} d={`M${b.x+b.w-11} ${b.y+b.titleY-8}l4 4-4 4`}
                     fill="none" stroke={n.color} strokeWidth="1.3" aria-hidden="true" pointerEvents="none" />}
@@ -496,6 +543,10 @@ export function Lens({
           >
             +
           </button>
+          <select aria-label="Товщина ліній" title="Товщина виділяє навігацію, а не клінічну важливість" value={lineProfile}
+            onChange={e=>setLineProfile(e.target.value as LineProfile)}>
+            {Object.entries(lineProfiles).map(([id,p])=><option value={id} key={id}>{p.label} лінії</option>)}
+          </select>
         </div>
       </div>
       <div className="lens-key" aria-label="Позначення вузлів">

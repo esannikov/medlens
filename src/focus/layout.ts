@@ -108,6 +108,8 @@ export type Path = {
 };
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Label = Rect & {
+  textAnchor: "start" | "middle" | "end";
+  textX: number;
   anchor: number;
   variant: number;
   opacity: number;
@@ -134,6 +136,20 @@ export type Label = Rect & {
   distance: number;
 };
 export type Measure = (text: string, font: string) => number;
+export const lineProfiles = {
+  fine: { label: "Тонкі", factor: 0.75 },
+  balanced: { label: "Збалансовані", factor: 1 },
+  bold: { label: "Виразні", factor: 1.35 },
+};
+export type LineProfile = keyof typeof lineProfiles;
+/** Display emphasis only, never confidence, diagnostic importance or quantity. */
+export function connectionStyle(near: number, role: "route" | "branch" | "context", profile: LineProfile) {
+  const t = Math.max(0, Math.min(1, near)), factor = lineProfiles[profile].factor;
+  return {
+    width: factor * (role === "route" ? 1.65 + 0.7*t : role === "branch" ? 0.85 + 0.7*t : 0.65 + 0.12*t),
+    opacity: role === "route" ? 0.86 : role === "branch" ? 0.34 + 0.42*t : 0.2 + 0.12*t,
+  };
+}
 const titleFont =
   "600 12.5px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
 const family = "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
@@ -351,7 +367,7 @@ export function placeLabels(
       const w = (caption.disclosure ? 16 : 0) + Math.min(
         limit,
         Math.max(
-          76,
+          44,
           ...lines.map((t) => measure(t, titleFont) + 8),
           ...dateLines.map((t) => measure(t, metaFont) + 8),
           ...contentLines.map(t => measure(t, valueFont) + 8),
@@ -380,7 +396,7 @@ export function placeLabels(
           dateBand +
           detailSize +
           3;
-      const gap = p.radius + 12;
+      const gap = p.radius + 8;
       const positions = Array.from({length: 32}, (_, i) => {
         const angle = -Math.PI / 2 + i * Math.PI / 16;
         const dx = Math.cos(angle), dy = Math.sin(angle);
@@ -445,11 +461,17 @@ export function placeLabels(
       trials.sort((a,b) => remembered
         ? Math.hypot(a.x - remembered.x, a.y - remembered.y) - Math.hypot(b.x - remembered.x, b.y - remembered.y)
         : breathingRoom(b) - breathingRoom(a) + 10 * (quietness(b) - quietness(a)));
-      const box = trials.find(b => b.anchor === remembered?.anchor && clear(b, false)) ||
-        trials.find((b) => clear(b, true)) || trials.find((b) => clear(b, false));
+      const allowOwn = n.kind !== "observation";
+      const box = trials.find(b => b.anchor === remembered?.anchor && clear(b, !allowOwn)) ||
+        trials.find((b) => clear(b, true)) || (allowOwn ? trials.find((b) => clear(b, false)) : undefined);
       if (!box) continue;
+      const textAnchor = moving && remembered ? remembered.textAnchor :
+        p.x >= box.x + box.w ? "end" : p.x <= box.x ? "start" : "middle";
+      const textLeft = box.x + 4, textRight = box.x + box.w - 4 - (caption.disclosure ? 16 : 0);
       labels.push({
         ...box,
+        textAnchor,
+        textX: textAnchor === "end" ? textRight : textAnchor === "start" ? textLeft : (textLeft + textRight)/2,
         variant,
         nodeX: p.x,
         nodeY: p.y,

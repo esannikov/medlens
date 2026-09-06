@@ -9,6 +9,7 @@ import {
   wrapText,
   lensTypography,
   graphCaption,
+  connectionStyle,
 } from "./src/focus/layout.ts";
 import {
   createLensModel,
@@ -118,6 +119,16 @@ const studyGeometry = lensGeometry(lm,longStudy.id,all,longStudy.p2,1440,800);
 const studyLabel = placeLabels(lm,longStudy.id,all,studyGeometry.points,studyGeometry.paths,1440,800,measure)
   .find(b => b.id === longStudy.id);
 assert.equal(studyLabel?.lines.join(" "),longStudy.title,"The large central study title must be complete");
+const serum=lm.order.find(n=>n.kind==="specimen" && n.title==="сироватка крові" && lm.eventFor(n)?.payload.title_uk==="Електрофорез та імунофіксація крові та сечі");
+const serumGeometry=lensGeometry(lm,serum.id,all,serum.p2,1440,800);
+assert(placeLabels(lm,serum.id,all,serumGeometry.points,serumGeometry.paths,1440,800,measure).some(b=>b.id===serum.id),
+  "The central material name must remain present inside a result fan");
+for(const t of [0,0.25,0.5,1]) {
+  const route=connectionStyle(t,"route","balanced"),branch=connectionStyle(t,"branch","balanced"),context=connectionStyle(t,"context","balanced");
+  assert(route.width>branch.width && branch.width>context.width,"Stroke hierarchy identifies navigation, branch and context");
+  assert(connectionStyle(t,"branch","bold").width>branch.width && connectionStyle(t,"branch","fine").width<branch.width);
+  assert(context.width>=0.65,"Context connections remain present");
+}
 for (const n of lm.order) {
   const caption=graphCaption(lm,n);
   assert(!caption.title.includes("…"), "Navigation captions must not be clipped clinical assertions");
@@ -163,6 +174,9 @@ assert.doesNotMatch(
   /\[lm, selected, scope, points, paths, size, measure,\s*moving\]/,
   "Changing only the motion flag must not invalidate the label layout on pointerup",
 );
+assert.doesNotMatch(readFileSync(new URL("./src/focus/Lens.tsx",import.meta.url),"utf8"),
+  /useEffect\(\(\) => \{ labelMemory\.current\.clear\(\); \}/,
+  "A passive effect must not erase the just-committed placement after resize");
 for (let i = 1; i <= 100; i++) {
   assert(
     lensTypography(i / 100).titleSize < lensTypography((i - 1) / 100).titleSize,
@@ -227,6 +241,10 @@ for (const [width, height] of [
       captionFallbacks++;
     }
     for (const b of boxes) {
+      const nodePoint=g.points.find(p=>p.id===b.id);
+      if(nodePoint.x>=b.x+b.w)assert.equal(b.textAnchor,"end","Left-hand captions align toward their own node");
+      if(nodePoint.x<=b.x)assert.equal(b.textAnchor,"start","Right-hand captions align toward their own node");
+      assert(b.textX>=b.x+4 && b.textX<=b.x+b.w-4);
       assert.equal(b.lines.join(" "),graphCaption(lm,lm.nodes.get(b.id)).title.replace(/\s+/g," "),
         "Every displayed label is complete navigation text");
       assert.equal(b.contentLines.join(" "),b.content.replace(/\s+/g," "), "Displayed values must not be ellipsized");
