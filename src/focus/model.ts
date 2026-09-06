@@ -34,7 +34,7 @@ export type LensNode = {
 };
 export type DateInfo = {
   day: string | null;
-  basis: "own" | "study" | "comparison" | "unknown" | "none";
+  basis: "own" | "study" | "issued" | "comparison" | "unknown" | "none";
   text: string;
 };
 export type Scope = {
@@ -46,6 +46,19 @@ export const counted = (n: number, forms: [string, string, string]) =>
   `${n} ${forms[new Intl.PluralRules("uk-UA").select(n) === "one" ? 0 : new Intl.PluralRules("uk-UA").select(n) === "few" ? 1 : 2]}`;
 const norm2 = (p: Vec) => p[0] ** 2 + p[1] ** 2;
 export const norm = (p: Vec) => Math.sqrt(norm2(p));
+/** Display/filter fallback only. Never writes to Clinical Time. */
+export function issueDate(event?: Obj): string | null {
+  const issued = (event?.payload.times || []).filter((t: {kind: string}) => t.kind === "issued");
+  if (!issued.length) return null;
+  const dates: string[] = [];
+  for (const t of issued) {
+    if (typeof t.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return null;
+    const epoch = Date.parse(`${t.date}T00:00:00Z`);
+    if (!Number.isFinite(epoch) || new Date(epoch).toISOString().slice(0,10) !== t.date) return null;
+    dates.push(t.date);
+  }
+  return new Set(dates).size === 1 ? dates[0] : null;
+}
 export function clampDisk(p: Vec, maximum = 0.9995): Vec {
   const r = norm(p);
   return r > maximum ? (p.map((v) => (v * maximum) / r) as Vec) : p;
@@ -231,7 +244,14 @@ export function createLensModel(data: Snapshot) {
           basis: "study",
           text: `${date(event.clinical_time.start)} · за дослідженням`,
         };
-      else info = { day: null, basis: "unknown", text: "Дата не визначена" };
+      else {
+        const issued = issueDate(event);
+        info = issued ? {
+          day: issued,
+          basis: "issued",
+          text: `${date(issued)} · ${n.kind === "clinical_event" ? "видано" : "за датою видачі дослідження"}`,
+        } : { day: null, basis: "unknown", text: "Дата не визначена" };
+      }
     }
     times.set(n.id, info);
   }
@@ -308,6 +328,13 @@ export function createLensModel(data: Snapshot) {
         (e) => e.source === n.parent && e.target === n.id,
       ),
     }));
+  const matches = (id: string, query: string) => {
+    const object = nodes.get(id)?.object;
+    if (!object) return false;
+    const displayTime = (times.get(id)?.text || "").toLocaleLowerCase("uk-UA");
+    return query.trim().toLocaleLowerCase("uk-UA").split(/\s+/)
+      .every(token => m.matches(object, token) || displayTime.includes(token));
+  };
   return {
     m,
     data,
@@ -326,6 +353,7 @@ export function createLensModel(data: Snapshot) {
     title,
     summary,
     displayEdges,
+    matches,
   };
 }
 export type LensModel = ReturnType<typeof createLensModel>;

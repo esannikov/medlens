@@ -52,3 +52,13 @@ The single detector run reported a `layout-transition` warning matching the subs
 Independent review raised a possible pointerup text-anchor change; label memoization already prevents motion-only reflow, and the complete text coordinates/alignment were checked through the browser. A separate functional resize/first-drag defect was found: passive cache reset erased the just-committed anchors. Reset now precedes layout storage in the layout-effect phase, with a regression guarding the lifecycle. No extra visual-polish cycle was performed for this functional repair.
 
 Final automated suite: 756 layouts, 5,225 labels, 178 motion checks plus alignment/stroke tests. Build PASS. Clinical dataset hash unchanged; clinician acceptance remains false. Dense-position label suppression remains an existing fallback, not a claim of perfect placement for every view.
+
+## User-authorized issue-date fallback — 2026-09-06
+
+The user requested using issuance dates after the distinction between clinical and administrative dates was explained. The read-only display policy is now: own clinical date → parent study clinical date → unique valid explicit issue date → unknown. Temporal-relation endpoint dates are unchanged. No clinical date, payload or public-data hash is rewritten.
+
+Seven studies and 76 results receive an `issued` display basis. The visible date range now ends on 24.08.2026 (11 unique display dates). Nine clinically dated studies retain their dates. Date search includes the display fallback; table, reader, lens and timeline all show its role. The timeline no longer calls this mixed date range exclusively clinical.
+
+Tests cover clinical-date precedence, child fallback, inclusive cutoff and exclusion before issuance even with the undated toggle enabled, invalid/conflicting issue dates, duplicate identical issue dates, and rejection of registration/order as substitutes. `npm test` and build PASS: 185 objects, 148 results, 756 layouts, 5,223 labels, 178 motion checks.
+
+Browser verified `Загальний аналіз сечі — 19.08.2026 · видано`; the study is absent at 18.08 and present at 19.08. All 185 table rows return at 24.08. Desktop lens/table and mobile screenshots were inspected, with no horizontal overflow or page errors. Detector returned `[]`. Independent read-only review found no blocking issue.

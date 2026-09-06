@@ -171,7 +171,7 @@ function Workspace({ data }: { data: Snapshot }) {
     ? lm.order
         .filter(
           (n) =>
-            n.object && n.kind !== "patient" && lm.m.matches(n.object, query),
+            n.object && n.kind !== "patient" && lm.matches(n.id, query),
         )
         .sort(
           (a, b) =>
@@ -196,6 +196,7 @@ function Workspace({ data }: { data: Snapshot }) {
   const studyGrouped = visibleResults.filter(
     (o) => lm.times.get(o.object_id)!.basis === "study",
   ).length;
+  const issueGrouped = visibleResults.filter(o => lm.times.get(o.object_id)!.basis === "issued").length;
   const timeControls = (
     <Timeline
       lm={lm}
@@ -677,6 +678,7 @@ function Workspace({ data }: { data: Snapshot }) {
           {studyGrouped
             ? `${studyGrouped} результатів згруповано за датою дослідження; власна дата відсутня. `
             : ""}
+          {issueGrouped ? `${issueGrouped} результатів — за датою видачі. ` : ""}
           Публічний знімок · без гіпотез · не для клінічних рішень.
         </span>
       </div>
@@ -770,6 +772,7 @@ function ObjectDetail({
           <dd>
             {t.text}
             {t.basis === "study" && <small>Власної дати запису немає.</small>}
+            {t.basis === "issued" && <small>Клінічна дата не визначена. Для відбору використано дату видачі дослідження.</small>}
           </dd>
           {n.kind === "observation" && (
             <>

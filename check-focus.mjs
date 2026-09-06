@@ -17,6 +17,7 @@ import {
   geodesic,
   norm,
   compareScopes,
+  issueDate,
 } from "./src/focus/model.ts";
 const data = JSON.parse(
   readFileSync(new URL("./public/data/case024.json", import.meta.url), "utf8"),
@@ -90,9 +91,34 @@ const administrativeOnly = lm.m.events.filter(
 assert(administrativeOnly.length > 0);
 assert(
   administrativeOnly.every(
-    (e) => lm.times.get(e.object_id).basis === "unknown",
+    (e) => lm.times.get(e.object_id).basis === "issued",
   ),
+  "Use the explicit issue date when clinical time is unknown",
 );
+assert.equal(administrativeOnly.length,7);
+assert.equal(lm.m.results.filter(o=>lm.times.get(o.object_id).basis==="issued").length,76);
+assert.equal(lm.days.at(-1),"2026-08-24");
+for(const n of lm.order.filter(n=>n.object && n.kind!=="patient" && n.kind!=="temporal_relation")) {
+  const t=lm.times.get(n.id);
+  if(n.object.clinical_time.start) {
+    assert.equal(t.basis,"own");
+    assert.equal(t.day,n.object.clinical_time.start,"Do not replace a known clinical date with a later issue date");
+  }
+  if(t.basis==="issued") {
+    assert.equal(n.object.clinical_time.start,null);
+    assert.equal(t.day,issueDate(lm.eventFor(n)));
+    const previousDay=new Date(Date.parse(t.day+"T00:00:00Z")-86400000).toISOString().slice(0,10);
+    assert(!lm.eligible(n.id,{...all,cutoff:previousDay}),"Undated toggle must not bypass an issue-date cutoff");
+    assert(lm.eligible(n.id,{...all,cutoff:t.day}));
+  }
+}
+const mockEvent=(times)=>({...administrativeOnly[0],payload:{...administrativeOnly[0].payload,times}});
+assert.equal(issueDate(mockEvent([{kind:"registered",date:"2026-04-09"},{kind:"ordered",date:"2026-04-10"}])),null);
+assert.equal(issueDate(mockEvent([{kind:"issued",date:"2026-04-20"},{kind:"issued",date:"2026-04-21"}])),null);
+assert.equal(issueDate(mockEvent([{kind:"issued",date:"2026-02-30"}])),null);
+assert.equal(issueDate(mockEvent([{kind:"issued",date:"2026-04-20"},{kind:"issued",date:"2026-04-20"}])),"2026-04-20");
+const urineStudy=lm.m.events.find(e=>e.payload.title_uk==="Загальний аналіз сечі");
+assert(lm.matches(urineStudy.object_id,"аналіз сечі 19.08.2026"));
 const lab = { ...all, group: "group:laboratory_panel" };
 assert(
   lm.order
@@ -372,7 +398,7 @@ console.log(
     status: "PASS",
     objects: data.objects.length,
     results: 148,
-    clinicalDays: lm.days.length,
+    displayDays: lm.days.length,
     navigationGroups: lm.order.filter((n) => !n.object).length,
     mathChecks,
     layoutChecks,

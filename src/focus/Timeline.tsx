@@ -23,7 +23,7 @@ export function Timeline({
   if (!days.length)
     return (
       <footer id="lens-time-controls" className="timeline">
-        <strong>Клінічні дати не визначені.</strong>
+        <strong>Дати для відбору не визначені.</strong>
         <span>Усі записи доступні у відборі «Без дати».</span>
       </footer>
     );
@@ -37,6 +37,7 @@ export function Timeline({
       lm.times.get(o.object_id)?.basis === "unknown",
   ).length;
   const temporalScope = scope.group === "group:temporal";
+  const issued = lm.m.results.filter(o => lm.eligible(o.object_id,scope) && lm.times.get(o.object_id)?.basis === "issued").length;
   const epoch = (s: string) => Date.parse(`${s}T00:00:00Z`),
     min = epoch(first),
     max = epoch(last),
@@ -60,11 +61,12 @@ export function Timeline({
           <strong>
             {scope.cutoff
               ? `Записи до ${date(scope.cutoff)}`
-              : "Усі клінічні дати"}
+              : "Усі дати досліджень"}
           </strong>
           <span>
             {temporalScope ? `${lm.m.temporal.filter(o=>lm.eligible(o.object_id,scope)).length} із ${lm.m.temporal.length} порівнянь · від дати пізнішого запису` : `${counts.visibleResults-undated} датованих + ${undated} без дати · ${counts.visibleResults} із ${counts.results} результатів`}
           </span>
+          {!temporalScope && issued > 0 && <span>{issued} результатів — за датою видачі</span>}
         </div>
         <div className="time-buttons">
           <button
@@ -75,7 +77,7 @@ export function Timeline({
             ←
           </button>
           <input
-            aria-label="Кінцева клінічна дата"
+            aria-label="Кінцева дата відбору"
             type="date"
             min={first}
             max={last}
@@ -141,7 +143,7 @@ export function Timeline({
         {baseline
           ? `Дата A — ${date(baseline)}. Тепер оберіть другу дату B. У таблиці можна зіставити склад записів.`
           : "Оберіть дату: залишаться записи до неї включно. «Усі дати» скасовує цей відбір."}{" "}
-        Записи без дати керуються окремим перемикачем «Без дати».
+        Якщо клінічної дати немає, використано дату видачі з позначкою «видано». Записи без обох дат керуються перемикачем «Без дати».
       </p>
       <div className="time-foot">
         <span>{date(first)}</span>
