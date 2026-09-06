@@ -110,6 +110,41 @@ const measure = (text, font = "12.5px") =>
     0,
   ) *
   (Number(font.match(/([\d.]+)px/)?.[1] || 12.5) / 12.5);
+// Reproduce the reported circular drag: previously the same title teleported
+// 140–280px between the eight independent placement slots.
+let motionChecks = 0;
+for (const title of [
+  "Електрофорез та імунофіксація крові та сечі",
+  "Загальний аналіз сечі",
+]) {
+  const node = lm.order.find(n => n.kind === "clinical_event" && n.title === title);
+  const memory = new Map();
+  let previous;
+  for (let i = 0; i < 90; i++) {
+    const angle = i / 90 * Math.PI * 2;
+    const focus = focusPoint([0.13 * Math.cos(angle), 0.13 * Math.sin(angle)], node.p2.map(v => -v));
+    const g = lensGeometry(lm, lm.root, all, focus, 1440, 800);
+    const labels = placeLabels(lm, lm.root, all, g.points, g.paths, 1440, 800, measure, memory, true);
+    const current = labels.find(b => b.id === node.id);
+    if (current && previous) {
+      assert(Math.hypot(current.x - previous.x, current.y - previous.y) < 35,
+        "A label must follow its node, not jump to a different side during drag");
+      motionChecks++;
+    }
+    previous = current;
+    labels.forEach(b => memory.set(b.id, b));
+  }
+  const g = lensGeometry(lm, lm.root, all, node.p2, 1440, 800);
+  const labels = placeLabels(lm, lm.root, all, g.points, g.paths, 1440, 800, measure);
+  assert(labels.some(b => b.distance > 0.90 && lm.nodes.get(b.id).kind === "observation"),
+    "Show result values before they reach the inner lens");
+}
+assert.equal(motionChecks, 178, "Both long study captions must remain visible throughout the circular drag");
+assert.doesNotMatch(
+  readFileSync(new URL("./src/focus/Lens.tsx", import.meta.url), "utf8"),
+  /\[lm, selected, scope, points, paths, size, measure,\s*moving\]/,
+  "Changing only the motion flag must not invalidate the label layout on pointerup",
+);
 for (let i = 1; i <= 100; i++) {
   assert(
     lensTypography(i / 100).titleSize < lensTypography((i - 1) / 100).titleSize,
@@ -119,7 +154,7 @@ for (let i = 1; i <= 100; i++) {
       lensTypography((i - 1) / 100).detailSize,
   );
 }
-assert.equal(lensTypography(0).titleSize, 21);
+assert.equal(lensTypography(0).titleSize, 26);
 assert.equal(lensTypography(1).titleSize, 11.5);
 for (const [width, height] of [
   [1440, 646],
@@ -198,6 +233,7 @@ for (const [width, height] of [
         );
       for (const path of g.paths) {
         if (path.source === b.id || path.target === b.id) continue;
+        if (!path.local && !path.ancestor) continue;
         const points = path.points;
         const inner = {
           x: b.x + 0.02,
@@ -208,7 +244,7 @@ for (const [width, height] of [
         for (let i = 1; i < points.length; i++)
           assert(
             !crosses(inner, points[i - 1], points[i]),
-            "Unrelated connection crosses text",
+            "Active branch connection crosses another label",
           );
       }
       assert(
@@ -302,7 +338,8 @@ console.log(
     labelsChecked,
     captionFallbacks,
     navigationChecks,
+    motionChecks,
     scope:
-      "2D focus navigation; complete thin connections; unboxed adjacent text without node/foreign-edge overlaps; radial font scale; dates and comparison endpoints; no clinical mutation",
+      "2D focus navigation; thin context connections; unboxed adjacent text protecting nodes and active branch; continuous type scale; dates and comparison endpoints; no clinical mutation",
   }),
 );

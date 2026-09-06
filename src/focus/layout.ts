@@ -85,6 +85,11 @@ export type Path = {
 };
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Label = Rect & {
+  anchor: number;
+  variant: number;
+  opacity: number;
+  nodeX: number;
+  nodeY: number;
   id: string;
   lines: string[];
   meta: string;
@@ -109,9 +114,9 @@ const family = "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
 export function lensTypography(distance: number) {
   const near = Math.max(0, Math.min(1, 1 - distance));
   return {
-    titleSize: 11.5 + 9.5 * near ** 1.2,
-    detailSize: 10 + 4 * near ** 1.1,
-    metaSize: 10 + 2 * near,
+    titleSize: 11.5 + 14.5 * near ** 0.8,
+    detailSize: 10 + 8 * near ** 0.8,
+    metaSize: 10 + 3 * near ** 0.8,
   };
 }
 
@@ -257,55 +262,46 @@ export function placeLabels(
   width: number,
   height: number,
   measure: Measure,
+  previous: ReadonlyMap<string, Label> = new Map(),
+  moving = false,
 ) {
   const labels: Label[] = [];
   const candidates = points
-    .filter((p) => p.active && norm(p.p) < 0.89)
+    .filter((p) => p.active && norm(p.p) < 0.975)
     .sort((a, b) => norm(a.p) - norm(b.p));
-  const central = candidates[0]?.id;
   for (const p of candidates) {
     if (labels.length >= (width < 600 ? 12 : 24)) break;
     const n = lm.nodes.get(p.id)!,
       info = preview(lm, n, scope),
-      centered = p.id === central,
       chosen = p.id === selected;
+    const remembered = previous.get(p.id);
     const distance = norm(p.p),
       typography = lensTypography(distance);
     const { titleSize, detailSize, metaSize } = typography;
-    const weight = chosen ? 700 : centered ? 650 : 550;
+    const weight = chosen ? 700 : 550;
     const titleFont = `${weight} ${titleSize}px ${family}`,
       valueFont = `${detailSize}px ${family}`,
       metaFont = `${metaSize}px ${family}`;
-    const brief = centered
-      ? info.content
-      : info.content
+    const brief = info.content
           .replace(/дослідження|досліджень/g, "досл.")
           .replace(/результатів|результати|результат/g, "рез.");
-    const meta = centered ? (chosen ? "Обрано" : "У фокусі") : "";
-    const widths = centered
-      ? width < 600
-        ? [216, 178, 142]
-        : [268, 224, 178]
-      : distance < 0.5
-        ? [218, 180, 142]
-        : [166, 138, 112];
+    // Focus is already named in the fixed orientation bar. Do not add/remove
+    // a line inside the moving label when nearest-node identity changes.
+    const meta = chosen ? "Обрано" : "";
+    const widths = width < 600 ? [216, 178, 142] : [284, 238, 196];
+    const variants = remembered
+      ? moving ? [remembered.variant] : [remembered.variant, ...[0, 1, 2].filter(i => i !== remembered.variant)]
+      : [0, 1, 2];
     let placed = false;
-    for (const maximum of widths) {
-      const limit = Math.min(
-        maximum,
-        Math.max(
-          96,
-          measure(n.title, titleFont) + 8,
-          measure(brief, valueFont) + 8,
-        ),
-      );
-      const lines = wrapText(
-        n.title,
-        limit - 8,
-        measure,
-        titleFont,
-        centered ? 3 : distance < 0.5 ? 2 : 1,
-      );
+    for (const variant of variants) {
+      // Typeset once in a fixed coordinate system; scale that composition.
+      // No 1/2/3-line or width switch at arbitrary lens radii.
+      const scale = titleSize / 26;
+      const longestWord = Math.max(...n.title.split(/\s+/).map(word => measure(word, `700 26px ${family}`)));
+      const baseWidth = Math.min(width - 24, Math.max(widths[variant], longestWord + 8));
+      const lines = wrapText(n.title, baseWidth - 8, measure,
+        `700 26px ${family}`, n.kind === "clinical_event" ? 3 : 2);
+      const limit = (baseWidth - 8) * scale + 8;
       const dateText =
         n.kind === "clinical_event" || n.kind === "temporal_relation"
           ? lm.times.get(n.id)!.text
@@ -348,18 +344,22 @@ export function placeLabels(
           detailSize +
           3;
       const gap = p.radius + 12;
-      const positions = [
-        { x: p.x - w / 2, y: p.y - gap - h },
-        { x: p.x + gap, y: p.y - h / 2 },
-        { x: p.x - w - gap, y: p.y - h / 2 },
-        { x: p.x - w / 2, y: p.y + gap },
-        { x: p.x + gap, y: p.y - gap - h },
-        { x: p.x - w - gap, y: p.y - gap - h },
-        { x: p.x + gap, y: p.y + gap },
-        { x: p.x - w - gap, y: p.y + gap },
-      ];
-      const trials = positions
-        .map((pos) => ({ ...pos, w, h }))
+      const positions = Array.from({length: 32}, (_, i) => {
+        const angle = -Math.PI / 2 + i * Math.PI / 16;
+        const dx = Math.cos(angle), dy = Math.sin(angle);
+        const reach = Math.min((w / 2 + gap) / Math.max(1e-9, Math.abs(dx)),
+          (h / 2 + gap) / Math.max(1e-9, Math.abs(dy)));
+        return {x: p.x + dx * reach - w / 2, y: p.y + dy * reach - h / 2};
+      });
+      const anchors = remembered
+        ? moving ? [0,-1,1,-2,2].map(d => (remembered.anchor + d + 32) % 32)
+          : [remembered.anchor, ...positions.map((_, i) => i).filter(i => i !== remembered.anchor)]
+        : positions.map((_, i) => i);
+      const trials = anchors
+        .map((anchor) => ({ ...positions[anchor], w, h, anchor }))
+        .filter(b => !moving || !remembered || Math.hypot(
+          b.x - remembered.x - (p.x - remembered.nodeX),
+          b.y - remembered.y - (p.y - remembered.nodeY)) < 24)
         .filter(
           (b) =>
             b.x >= 10 &&
@@ -379,22 +379,44 @@ export function placeLabels(
               }),
             ),
         );
-      // Prefer a clear sector. An own incident stroke can sit behind its text
-      // halo, but another node's connection may never be obscured.
+      // Protect the active branch. Faint context strokes may sit behind the
+      // existing text halo; treating them as solid obstacles made titles flee
+      // or disappear while the perimeter moved. Nodes never yield to text.
       const clear = (b: Rect, includeOwn: boolean) =>
         !paths.some(
           (path) =>
+            (path.local || path.ancestor) &&
             (includeOwn || (path.source !== p.id && path.target !== p.id)) &&
             path.points
               .slice(1)
               .some((end, i) => crosses(b, path.points[i], end, 2)),
         );
-      const box =
-        trials.find((b) => clear(b, true)) ||
-        trials.find((b) => clear(b, false));
+      // Start in the widest quiet sector, not the first temporarily empty slot.
+      // This leaves room for the adjoining branches to move during a gesture.
+      const incident = paths.flatMap(path => path.source === p.id
+        ? [path.points[1]] : path.target === p.id ? [path.points.at(-2)!] : []);
+      const quietness = (b: Rect) => {
+        const dx = b.x + b.w / 2 - p.x, dy = b.y + b.h / 2 - p.y;
+        return Math.min(2, ...incident.map(([x,y]) =>
+          1 - ((x - p.x) * dx + (y - p.y) * dy) /
+            Math.max(1e-6, Math.hypot(x - p.x, y - p.y) * Math.hypot(dx,dy))));
+      };
+      const breathingRoom = (b: Rect) => Math.min(120, ...points
+        .filter(o => o.id !== p.id)
+        .map(o => Math.hypot(Math.max(b.x - o.x, 0, o.x - b.x - b.w),
+          Math.max(b.y - o.y, 0, o.y - b.y - b.h)) - o.radius));
+      trials.sort((a,b) => remembered
+        ? Math.hypot(a.x - remembered.x, a.y - remembered.y) - Math.hypot(b.x - remembered.x, b.y - remembered.y)
+        : breathingRoom(b) - breathingRoom(a) + 10 * (quietness(b) - quietness(a)));
+      const box = trials.find(b => b.anchor === remembered?.anchor && clear(b, false)) ||
+        trials.find((b) => clear(b, true)) || trials.find((b) => clear(b, false));
       if (!box) continue;
       labels.push({
         ...box,
+        variant,
+        nodeX: p.x,
+        nodeY: p.y,
+        opacity: Math.min(1, Math.max(0, (0.975 - distance) / 0.035)),
         id: p.id,
         lines,
         meta,

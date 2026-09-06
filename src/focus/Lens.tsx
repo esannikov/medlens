@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   clampDisk,
   focusPoint,
@@ -14,6 +14,7 @@ import {
   placeLabels,
   preview,
   type Measure,
+  type Label,
 } from "./layout.ts";
 import { NodeGlyph, NodeShape } from "./NodeGlyph";
 
@@ -42,6 +43,7 @@ export function Lens({
     ),
     frame = useRef(0);
   const volumeId = `lens-volume-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const labelMemory = useRef(new Map<string, Label>());
   const [size, setSize] = useState({ width: 800, height: 500 });
   const [focus, setFocus] = useState<Vec>(() => lm.nodes.get(selected)!.p2),
     currentFocus = useRef(focus);
@@ -84,7 +86,12 @@ export function Lens({
       currentFocus.current = p;
       setFocus(p);
       if (t < 1) frame.current = requestAnimationFrame(tick);
-      else setMoving(false);
+      else {
+        // Settle a clicked destination with fresh clearance. Dragging thereafter
+        // retains this anchor instead of an old, compressed peripheral slot.
+        labelMemory.current.clear();
+        setMoving(false);
+      }
     };
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
@@ -106,9 +113,17 @@ export function Lens({
         size.width,
         size.height,
         measure,
+        labelMemory.current,
+        moving,
       ),
+    // Motion flags change feedback, not geometry. Pointerup must retain the
+    // last rendered placement rather than start a second, unlocked layout.
     [lm, selected, scope, points, paths, size, measure],
   );
+  useLayoutEffect(() => {
+    labels.forEach(label => labelMemory.current.set(label.id, label));
+  }, [labels]);
+  useEffect(() => { labelMemory.current.clear(); }, [lm, size.width, size.height, scope]);
   useEffect(() => onFocusChange(centerId), [centerId, onFocusChange]);
   const hoverNode = hovered ? lm.nodes.get(hovered) : null;
   const focusNode = lm.nodes.get(centerId)!,
@@ -209,6 +224,13 @@ export function Lens({
               <stop offset="83%" stopColor="#857398" stopOpacity="0" />
               <stop offset="100%" stopColor="#857398" stopOpacity="0.055" />
             </radialGradient>
+            <radialGradient id={`${volumeId}-focus`}>
+              <stop offset="0%" stopColor="#9983c4" stopOpacity="0.025" />
+              <stop offset="50%" stopColor="#9983c4" stopOpacity="0.055" />
+              <stop offset="70%" stopColor="#9983c4" stopOpacity="0.095" />
+              <stop offset="85%" stopColor="#9983c4" stopOpacity="0.035" />
+              <stop offset="100%" stopColor="#9983c4" stopOpacity="0" />
+            </radialGradient>
           </defs>
           <circle
             className="lens-boundary"
@@ -226,6 +248,15 @@ export function Lens({
             r={radius}
             fill={`url(#${volumeId}-rim)`}
             pointerEvents="none"
+          />
+          <circle
+            data-focus-zone="true"
+            cx={size.width / 2}
+            cy={size.height / 2}
+            r={radius * 0.62}
+            fill={`url(#${volumeId}-focus)`}
+            pointerEvents="none"
+            aria-hidden="true"
           />
           <g fill="none">
             {paths.map((path) => {
@@ -338,6 +369,8 @@ export function Lens({
                   tabIndex={0}
                   data-label-for={b.id}
                   data-label-distance={b.distance}
+                  data-label-anchor={b.anchor}
+                  opacity={b.opacity}
                   aria-label={`${content.kind}: ${n.title}. ${content.content}. ${content.time}. ${content.action}`}
                   onClick={() => choose(b.id)}
                   onKeyDown={(e) => {
