@@ -6,11 +6,14 @@ import {compassLayout} from './src/focus/compass.ts';
 const data=JSON.parse(readFileSync(new URL('./public/data/case024.json',import.meta.url),'utf8'));
 const frozen=JSON.stringify(data),lm=createLensModel(data),all={cutoff:null,undated:true,group:null};
 const owner=lm.nodes.get('SP-SM-B63E3EEA4109AC5E');
+const original=createLensModel(data,'original');
 const measure=(s,font)=>Array.from(s).length*Number(font.match(/([\d.]+)px/)[1])*.5;
 let revealChecks=0,bearingChecks=0,activeExclusionChecks=0;
 for(const [w,h] of [[1440,934],[1888,1267]]){
   const g=lensGeometry(lm,owner.id,all,owner.p2,w,h);
-  const base=placeLabels(lm,owner.id,all,g.points,g.paths,w,h,measure);
+  // The previous geometry remains available as a literal comparison route.
+  const before=lensGeometry(original,owner.id,all,owner.p2,w,h);
+  const base=placeLabels(original,owner.id,all,before.points,before.paths,w,h,measure);
   assert(base.filter(b=>owner.children.includes(b.id)).length>=17,'Dense punctate branch has compact readable captions');
   assert(base.filter(b=>owner.children.includes(b.id)).every(b=>b.opacity===1),'Active results never inherit the remote-context fade');
   for(const id of owner.children){

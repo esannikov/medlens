@@ -8,7 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node scripts/check-publication.mjs && node check-fonts.mjs && node check-focus.mjs && node check-features.mjs && node check-lens-upgrades.mjs && node check-session.mjs && node check-experiments.mjs && node check-control.mjs && node check-quiet.mjs && node check-compass.mjs && node check-reveal.mjs && node check-reader.mjs"
+    "test": "node scripts/check-publication.mjs && node check-fonts.mjs && node check-focus.mjs && node check-features.mjs && node check-lens-upgrades.mjs && node check-session.mjs && node check-experiments.mjs && node check-control.mjs && node check-quiet.mjs && node check-compass.mjs && node check-reveal.mjs && node check-reader.mjs && node check-spacing.mjs"
   },
   "dependencies": { "react": "19.2.8", "react-dom": "19.2.8" },
   "devDependencies": {

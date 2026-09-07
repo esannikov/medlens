@@ -1,6 +1,8 @@
 import {
   counted,
   focusPoint,
+  compactPoint,
+  lensCompression,
   geodesic,
   norm,
   type LensModel,
@@ -310,8 +312,9 @@ export function lensGeometry(
     width / 2 + p[0] * radius,
     height / 2 - p[1] * radius,
   ];
+  const raw=new Map(lm.order.map(n=>[n.id,focusPoint(n.p2,focus)]));
   const points: Point[] = lm.order.map((n) => {
-    const p = focusPoint(n.p2, focus),
+    const p = compactPoint(raw.get(n.id)!,lm.spacing,lensCompression(radius)),
       [x, y] = project(p),
       detail = norm(p) < 0.72;
     const base =
@@ -334,11 +337,10 @@ export function lensGeometry(
       detail,
     };
   });
-  const byId = new Map(points.map((p) => [p.id, p]));
   // Every navigation node keeps its parent connection, including the perimeter.
   const paths: Path[] = lm.displayEdges.map((e) => ({
     ...e,
-    points: geodesic(byId.get(e.source)!.p, byId.get(e.target)!.p).map(project),
+    points: geodesic(raw.get(e.source)!,raw.get(e.target)!).map(p=>project(compactPoint(p,lm.spacing,lensCompression(radius)))),
     local:
       ctx.local.has(e.target) &&
       (ctx.local.has(e.source) || e.source === ctx.parent?.id),
@@ -410,7 +412,7 @@ export function placeLabels(
     // redundant navigation metadata yields to space around the center node.
     const attention=p.id===options.attentionId;
     const availableVariants = centered || attention ? [3, 4, 5, 6, 7, 8, 0, 1, 2]
-      : options.compactPeers ? [9,10,0,1,2] : branch.has(p.id) ? [0, 1, 2, 9, 10] : [0, 1, 2];
+      : options.compactPeers ? [9,10,3,4,5,6,0,1,2] : branch.has(p.id) ? [0, 1, 2, 9, 10] : [0, 1, 2];
     const rememberedVariant = remembered && availableVariants.includes(remembered.variant) ? remembered.variant : null;
     const variants = remembered
       ? moving && !centered && rememberedVariant !== null ? [rememberedVariant, ...availableVariants.filter(i=>i>=9&&i!==rememberedVariant)]
@@ -494,15 +496,18 @@ export function placeLabels(
           detailSize +
           3;
       const gap = p.radius + 8;
-      const positions = Array.from({length: 32}, (_, i) => {
-        const angle = -Math.PI / 2 + i * Math.PI / 16;
+      // A second nearby anchor ring lets adjacent long captions coexist after
+      // compaction. It is a fallback, not a detached card or a cropped value.
+      const positions = Array.from({length: 64}, (_, i) => {
+        const angle = -Math.PI / 2 + (i%32) * Math.PI / 16;
+        const localGap=gap+Math.floor(i/32)*26;
         const dx = Math.cos(angle), dy = Math.sin(angle);
-        const reach = Math.min((w / 2 + gap) / Math.max(1e-9, Math.abs(dx)),
-          (h / 2 + gap) / Math.max(1e-9, Math.abs(dy)));
+        const reach = Math.min((w / 2 + localGap) / Math.max(1e-9, Math.abs(dx)),
+          (h / 2 + localGap) / Math.max(1e-9, Math.abs(dy)));
         return {x: p.x + dx * reach - w / 2, y: p.y + dy * reach - h / 2};
       });
       const anchors = remembered
-        ? moving && !releaseAnchor ? [0,-1,1,-2,2].map(d => (remembered.anchor + d + 32) % 32)
+        ? moving && !releaseAnchor ? [0,-1,1,-2,2].map(d => Math.floor(remembered.anchor/32)*32+(remembered.anchor%32 + d + 32) % 32)
           : [remembered.anchor, ...positions.map((_, i) => i).filter(i => i !== remembered.anchor)]
         : positions.map((_, i) => i);
       const trials = anchors
@@ -560,7 +565,7 @@ export function placeLabels(
           Math.max(b.y - o.y, 0, o.y - b.y - b.h)) - o.radius));
       trials.sort((a,b) => remembered
         ? Math.hypot(a.x - remembered.x, a.y - remembered.y) - Math.hypot(b.x - remembered.x, b.y - remembered.y)
-        : breathingRoom(b) - breathingRoom(a) + 10 * (quietness(b) - quietness(a)));
+        : (Math.floor(a.anchor/32)-Math.floor(b.anchor/32))*1000+breathingRoom(b) - breathingRoom(a) + 10 * (quietness(b) - quietness(a)));
       const allowOwn = centered || attention || branch.has(p.id) || options.allowedIds?.has(p.id) || n.kind !== "observation";
       const box = trials.find(b => b.anchor === remembered?.anchor && clear(b, !allowOwn)) ||
         trials.find((b) => clear(b, true)) || (allowOwn ? trials.find((b) => clear(b, false)) : undefined);

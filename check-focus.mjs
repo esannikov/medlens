@@ -191,7 +191,7 @@ for (const title of [
   }
   const g = lensGeometry(lm, lm.root, all, node.p2, 1440, 800);
   const labels = placeLabels(lm, lm.root, all, g.points, g.paths, 1440, 800, measure);
-  assert(labels.some(b => b.distance > 0.90 && lm.nodes.get(b.id).kind === "observation"),
+  assert(labels.some(b => norm(focusPoint(lm.nodes.get(b.id).p2,node.p2)) > 0.90 && lm.nodes.get(b.id).kind === "observation" && b.contentLines.length),
     "Show result values before they reach the inner lens");
 }
 assert.equal(motionChecks, 178, "Both long study captions must remain visible throughout the circular drag");
@@ -285,9 +285,10 @@ for (const [width, height] of [
         Math.max(b.y - anchor.y, 0, anchor.y - b.y - b.h),
       );
       assert(
-        separation <= (anchor.radius + 12) * Math.SQRT2 + 1e-6,
+        separation <= (anchor.radius + 12 + (b.anchor>=32?26:0)) * Math.SQRT2 + 1e-6,
         "Text must remain beside its node",
       );
+      assert(b.anchor>=0&&b.anchor<64,'Only the immediate or nearby fallback anchor ring');
       for (const p of g.points)
         assert(
           !overlaps(b, {

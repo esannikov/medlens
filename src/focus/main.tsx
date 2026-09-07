@@ -117,7 +117,9 @@ function App() {
   );
 }
 function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string }) {
-  const lm = useMemo(() => createLensModel(data), [data]);
+  // An isolated comparison route retains the previous geometry without a
+  // second panel, a different snapshot, or a new permanent control.
+  const lm = useMemo(() => createLensModel(data,new URLSearchParams(location.search).get('spacing')==='original'?'original':'compact'), [data]);
   const initial=useMemo(()=>viewFromURL(location.href,lm),[lm]);
   const [mode, setMode] = useState<Mode>(readMode);
   const [selected, setSelected] = useState(initial?.selected||lm.root),

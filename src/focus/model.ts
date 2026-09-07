@@ -80,7 +80,7 @@ export function focusPoint(p: Vec, a: Vec): Vec {
  * this keeps the grabbed world point z at the pointer's disk position w,
  * including when z starts at the compressed edge of the lens. */
 export function focusForAnchor(world: Vec, target: Vec): Vec {
-  const [zx, zy] = world, [wx, wy] = clampDisk(target, .995);
+  const [zx, zy] = world, [wx, wy] = clampDisk(target, 1-1e-9);
   const kx = wx * zx - wy * zy, ky = wx * zy + wy * zx;
   const bx = zx - wx, by = zy - wy;
   const denominator = Math.max(1e-12, 1 - kx * kx - ky * ky);
@@ -92,7 +92,45 @@ export function focusForAnchor(world: Vec, target: Vec): Vec {
 export const lerpVec = (a: Vec, b: Vec, t: number): Vec =>
   a.map((v, i) => v + (b[i] - v) * t) as Vec;
 
-export function createLensModel(data: Snapshot) {
+export type LensSpacing = 'compact' | 'original';
+
+// Keep the complete optical reading zone intact, including its label clearance.
+const COMPACT_CORE=.5, COMPACT_RATE=.35, COMPACT_EASE=6;
+export const lensCompression=(radius:number)=>{
+  const t=Math.max(0,Math.min(1,(radius-200)/160));
+  return t*t*(3-2*t);
+};
+const compactDistance=(d:number,strength:number)=>{
+  const start=Math.atanh(COMPACT_CORE),delta=d-start;
+  const rate=1-(1-COMPACT_RATE)*strength;
+  return delta<=0?d:start+rate*delta+(1-rate)*Math.tanh(COMPACT_EASE*delta)/COMPACT_EASE;
+};
+/** One monotone radial map for nodes AND every point of their connections.
+ * The core is unchanged; long spans contract continuously during camera motion.
+ * g'(d)=rate+(1-rate)*sech²(ease*d)>0: no folding or swapped branch order. */
+export function compactPoint(p:Vec,spacing:LensSpacing='compact',strength=1):Vec{
+  const r=norm(p);
+  if(spacing==='original'||strength===0||r<=COMPACT_CORE)return p;
+  const mapped=Math.tanh(compactDistance(Math.atanh(Math.min(r,1-1e-12)),strength));
+  return p.map(v=>v*mapped/r) as Vec;
+}
+/** Exact inverse of the same map for pointer anchoring. */
+export function expandPoint(p:Vec,spacing:LensSpacing='compact',strength=1):Vec{
+  if(spacing==='original'||strength===0)return p;
+  p=clampDisk(p,1-1e-9);
+  const r=norm(p);
+  if(r<=COMPACT_CORE)return p;
+  const target=Math.atanh(r);
+  let lo=target,hi=target/COMPACT_RATE;
+  for(let i=0;i<48;i++){
+    const mid=(lo+hi)/2;
+    if(compactDistance(mid,strength)<target)lo=mid;else hi=mid;
+  }
+  const raw=Math.tanh((lo+hi)/2);
+  return p.map(v=>v*raw/r) as Vec;
+}
+
+export function createLensModel(data: Snapshot, spacing: LensSpacing = 'compact') {
   const m = createModel(data),
     nodes = new Map<string, LensNode>();
   if (!m.patient) throw new Error("У графі немає пацієнта");
@@ -350,6 +388,7 @@ export function createLensModel(data: Snapshot) {
   };
   return {
     m,
+    spacing,
     data,
     root,
     nodes,

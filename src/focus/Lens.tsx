@@ -3,6 +3,9 @@ import {
   clampDisk,
   focusPoint,
   focusForAnchor,
+  compactPoint,
+  expandPoint,
+  lensCompression,
   geodesic,
   lerpVec,
   norm,
@@ -97,12 +100,15 @@ export function Lens({
     };
   }, []);
   useEffect(() => {
-    const observer = new ResizeObserver(([e]) =>
+    const observer = new ResizeObserver(([e]) => {
+      // The first real viewport must not inherit anchors from the placeholder
+      // 800×500 canvas. Clear before the render which computes its captions.
+      labelMemory.current.clear();
       setSize({
         width: Math.max(1, e.contentRect.width),
         height: Math.max(1, e.contentRect.height),
-      }),
-    );
+      });
+    });
     observer.observe(host.current!);
     return () => observer.disconnect();
   }, []);
@@ -203,8 +209,8 @@ export function Lens({
   const sourceEdgeIds = new Set(sourceEdges.map(edge => edge.id));
   const tracedNodes = new Set(sourceEdges.flatMap(edge => [edge.source, edge.target]));
   const structuralPaths = exactEdges.map(edge => {
-    const from = pointsById.get(edge.source)!, to = pointsById.get(edge.target)!;
-    const projected = geodesic(from.p, to.p).map(([x, y]) => [size.width / 2 + x * radius, size.height / 2 - y * radius]);
+    const from = focusPoint(lm.nodes.get(edge.source)!.p2,focus),to=focusPoint(lm.nodes.get(edge.target)!.p2,focus);
+    const projected = geodesic(from,to).map(p=>compactPoint(p,lm.spacing,lensCompression(radius))).map(([x,y])=>[size.width/2+x*radius,size.height/2-y*radius]);
     return { ...edge, trace: sourceEdgeIds.has(edge.id), d: projected.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ") };
   });
   const paintedPaths = paths.map(path => {
@@ -269,7 +275,7 @@ export function Lens({
     }
   };
   return (
-    <section className="lens-view lens-upgraded" aria-label="Лінза досьє" data-focus-caption={centerId} data-geometric-focus={geometricFocusId} data-reveal-owner={reveal.ownerId} data-reveal-allowed={Array.from(reveal.allowedIds).join(' ')} data-text-scale={textScale} data-unit-mode={canonicalUnits ? "canonical" : "source"}>
+    <section className="lens-view lens-upgraded" aria-label="Лінза досьє" data-spacing={lm.spacing} data-focus-caption={centerId} data-geometric-focus={geometricFocusId} data-reveal-owner={reveal.ownerId} data-reveal-allowed={Array.from(reveal.allowedIds).join(' ')} data-text-scale={textScale} data-unit-mode={canonicalUnits ? "canonical" : "source"}>
       {info.time && !labels.find(label=>label.id===centerId)?.dateLines.length && <span className="lens-date-context">{info.time}</span>}
       <div className="lens" ref={host} data-lens-mode="2d" data-moving={moving}>
         <svg
@@ -297,7 +303,7 @@ export function Lens({
             const node=id?lm.nodes.get(id):undefined;
             // Labels retain their initial pointer-to-node offset. Background
             // drags grab the actual disk location rather than its centre.
-            const anchor:Vec=node?focusPoint(node.p2,currentFocus.current):clampDisk([
+            const anchor:Vec=node?compactPoint(focusPoint(node.p2,currentFocus.current),lm.spacing,lensCompression(radius)):clampDisk([
               (e.clientX-bounds.left-size.width/2)/radius,
               -(e.clientY-bounds.top-size.height/2)/radius,
             ],.995);
@@ -306,7 +312,7 @@ export function Lens({
             drag.current = {
               x: e.clientX,
               y: e.clientY,
-              world: node?.p2 || focusPoint(anchor,currentFocus.current.map(v=>-v) as Vec),
+              world: node?.p2 || focusPoint(expandPoint(anchor,lm.spacing,lensCompression(radius)),currentFocus.current.map(v=>-v) as Vec),
               anchor,
               moved: false,
             };
@@ -328,10 +334,10 @@ export function Lens({
               setMoving(true);
               setHovered(null);
               e.currentTarget.setPointerCapture(e.pointerId);
-              const next = focusForAnchor(d.world,[
+              const next = focusForAnchor(d.world,expandPoint(clampDisk([
                 d.anchor[0]+(e.clientX-d.x)/radius,
                 d.anchor[1]-(e.clientY-d.y)/radius,
-              ]);
+              ],.995),lm.spacing,lensCompression(radius)));
               currentFocus.current = next;
               setFocus(next);
             }
@@ -460,6 +466,7 @@ export function Lens({
                   data-lens-node={p.id}
                   data-node-kind={n.kind}
                   data-detail={expanded}
+                  data-parent={n.parent||undefined}
                   className="node-target"
                   transform={`translate(${p.x} ${p.y})`}
                   onClick={() => choose(p.id)}
