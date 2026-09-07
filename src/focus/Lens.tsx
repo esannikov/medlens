@@ -21,6 +21,7 @@ import {
   type Label,
 } from "./layout.ts";
 import { NodeGlyph, NodeShape } from "./NodeGlyph";
+import { LENS_FONT_FAMILY } from "./typography.ts";
 
 export function Lens({
   lm,
@@ -31,6 +32,7 @@ export function Lens({
   onSelect,
   onRead,
   onFocusChange,
+  fontFamily = LENS_FONT_FAMILY,
 }: {
   lm: LensModel;
   selected: string;
@@ -40,6 +42,7 @@ export function Lens({
   onSelect: (id: string) => void;
   onRead: (id: string) => void;
   onFocusChange: (id: string) => void;
+  fontFamily?: string;
 }) {
   const host = useRef<HTMLDivElement>(null),
     drag = useRef<{ x: number; y: number; focus: Vec; moved: boolean } | null>(
@@ -59,6 +62,7 @@ export function Lens({
     [hovered, setHovered] = useState<string | null>(null);
   const measure = useMemo<Measure>(() => {
     const context = document.createElement("canvas").getContext("2d")!;
+    context.fontKerning = "none";
     return (text, font) => {
       context.font = font;
       return context.measureText(text).width;
@@ -122,10 +126,11 @@ export function Lens({
         measure,
         labelMemory.current,
         moving,
+        fontFamily,
       ),
     // Motion flags change feedback, not geometry. Pointerup must retain the
     // last rendered placement rather than start a second, unlocked layout.
-    [lm, selected, scope, points, paths, size, measure],
+    [lm, selected, scope, points, paths, size, measure, fontFamily],
   );
   // Reset before committing the new layout, not in a later passive effect.
   // Otherwise closing the reader erases the anchors needed by the first drag.
@@ -202,6 +207,7 @@ export function Lens({
       <div className="lens" ref={host} data-lens-mode="2d" data-moving={moving}>
         <svg
           className="lens-svg"
+          style={{fontFamily}}
           viewBox={`0 0 ${size.width} ${size.height}`}
           role="group"
           aria-label="Інтерактивна 2D-лінза графа"

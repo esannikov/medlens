@@ -62,3 +62,32 @@ Seven studies and 76 results receive an `issued` display basis. The visible date
 Tests cover clinical-date precedence, child fallback, inclusive cutoff and exclusion before issuance even with the undated toggle enabled, invalid/conflicting issue dates, duplicate identical issue dates, and rejection of registration/order as substitutes. `npm test` and build PASS: 185 objects, 148 results, 756 layouts, 5,223 labels, 178 motion checks.
 
 Browser verified `Загальний аналіз сечі — 19.08.2026 · видано`; the study is absent at 18.08 and present at 19.08. All 185 table rows return at 24.08. Desktop lens/table and mobile screenshots were inspected, with no horizontal overflow or page errors. Detector returned `[]`. Independent read-only review found no blocking issue.
+
+## Iosevka typography trial — 2026-09-07
+
+User-selected normal-width Iosevka applies to graph captions, values and dates;
+the shell and long prose reader retain their existing sans-serif. Three pinned
+local OFL-licensed faces are subsetted to 395,452 bytes. The generator verifies
+Ukrainian letters, Greek/medical symbols and equal advances. Programming ligatures
+are disabled. SVG and canvas measurement use the same selected family and weights.
+The graph mounts only after all faces are ready or a 2.5-second fallback decision;
+late font loads do not unexpectedly change the selected fallback geometry.
+
+Unit tests cover font hashes, three-weight loading, empty matches, synchronous and
+asynchronous failures, and timeout. Existing 756 layout and 178 motion checks pass;
+build passes. The one typography detector run returned `[]`.
+
+One batched desktop/mobile browser inspection was completed. At 1440px, the May 22
+CT displayed all six direct finding captions both centered and after a 40px/-30px
+drag. Visible SVG text fit its measured horizontal hit area (zero mismatches).
+All three font faces loaded; the table retained 185 rows. No horizontal overflow
+at 390px and no page errors. Screenshots were visually inspected. This does not
+guarantee all six labels at every position: mobile still suppresses captions where
+space is insufficient. The candidate/collision scheduler was not changed.
+
+Clinical JSON, dates and source text are unchanged. Technical typography checks
+do not imply clinical acceptance.
+
+A browser run that deliberately aborted all three WOFF2 requests selected the
+explicit system-monospace fallback and retained all 185 table rows. The three
+expected failed-resource console entries belong to that fault-injection test.

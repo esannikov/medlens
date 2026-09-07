@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
 import {
   date,
@@ -21,6 +21,7 @@ import { nodeKinds, preview } from "./layout.ts";
 import { TreeTable } from "./TreeTable";
 import { Timeline } from "./Timeline";
 import "./style.css";
+import { FALLBACK_FONT_FAMILY, loadLensTypeface } from "./typography.ts";
 
 const ALL: Scope = { cutoff: null, undated: true, group: null };
 type Mode = "2d" | "table";
@@ -68,8 +69,10 @@ function Icon({
 function App() {
   const [data, setData] = useState<Snapshot | null>(null),
     [error, setError] = useState("");
+  const [fontFamily,setFontFamily] = useState(FALLBACK_FONT_FAMILY);
   useEffect(() => {
     const ctl = new AbortController();
+    const typeface = loadLensTypeface();
     fetch(`${import.meta.env.BASE_URL}data/case024.json`, { signal: ctl.signal })
       .then(async (r) => {
         if (!r.ok)
@@ -78,7 +81,11 @@ function App() {
           );
         const d = await r.json();
         createLensModel(d);
-        setData(d);
+        const loadedFamily = await typeface;
+        if (!ctl.signal.aborted) {
+          setFontFamily(loadedFamily);
+          setData(d);
+        }
       })
       .catch((e) => {
         if (e.name !== "AbortError") setError(e.message);
@@ -86,7 +93,7 @@ function App() {
     return () => ctl.abort();
   }, []);
   return data ? (
-    <Workspace data={data} />
+    <Workspace data={data} fontFamily={fontFamily} />
   ) : (
     <main className="focus-loading">
       <Icon type="graph" />
@@ -96,7 +103,7 @@ function App() {
     </main>
   );
 }
-function Workspace({ data }: { data: Snapshot }) {
+function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string }) {
   const lm = useMemo(() => createLensModel(data), [data]);
   const [mode, setMode] = useState<Mode>(() => {
     const m = new URLSearchParams(location.search).get("lens");
@@ -221,7 +228,7 @@ function Workspace({ data }: { data: Snapshot }) {
     }
   }, [mode]);
   return (
-    <div className="focus-app">
+    <div className="focus-app" data-typeface={fontFamily} style={{"--lens-font":fontFamily} as CSSProperties}>
       <header className="focus-header">
         <button
           className="brand"
@@ -374,6 +381,7 @@ function Workspace({ data }: { data: Snapshot }) {
             />
           ) : (
             <Lens
+              fontFamily={fontFamily}
               lm={lm}
               scope={scope}
               centerKey={centerKey}

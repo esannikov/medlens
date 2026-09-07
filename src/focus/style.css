@@ -1,3 +1,18 @@
+@font-face {
+  font-family: "MedLens Iosevka";
+  src: url("/fonts/iosevka/iosevka-22.1.2-regular.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "MedLens Iosevka";
+  src: url("/fonts/iosevka/iosevka-22.1.2-medium.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "MedLens Iosevka";
+  src: url("/fonts/iosevka/iosevka-22.1.2-semibold.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #302b39;
@@ -9,6 +24,14 @@
   --line: #e6e0ec;
   --purple: #6750a4;
   --soft: #eee8f6;
+}
+.lens-svg, .focus-caption-text, .numeric, .result-value,
+.table-view td:nth-child(6), .timeline input[type="date"],
+.time-foot > span:first-child, .time-foot > span:last-child {
+  font-family: var(--lens-font, monospace);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  font-kerning: none;
 }
 * {
   box-sizing: border-box;
@@ -379,7 +402,7 @@ input[type="checkbox"] {
 }
 .lens-label.selected > text:first-of-type {
   fill: #6750a4;
-  font-weight: 700;
+  font-weight: 600;
 }
 .focus-workspace {
   min-height: max(780px, calc(100dvh - 190px));
@@ -838,8 +861,8 @@ input[type="checkbox"] {
 }
 .result-value {
   font-size: 35px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
+  font-weight: 600;
+  letter-spacing: 0;
   line-height: 1.25;
   margin: 0 0 22px;
   font-variant-numeric: tabular-nums;
@@ -1338,7 +1361,7 @@ code {
 .numeric {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  font-weight: 550;
+  font-weight: 500;
 }
 .muted {
   color: #9a91a2;

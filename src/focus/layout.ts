@@ -9,6 +9,7 @@ import {
   type Vec,
 } from "./model.ts";
 import { value } from "../model.ts";
+import { LENS_FONT_FAMILY } from "./typography.ts";
 
 export const nodeKinds: Record<LensNode["kind"], string> = {
   patient: "Досьє",
@@ -150,9 +151,7 @@ export function connectionStyle(near: number, role: "route" | "branch" | "contex
     opacity: role === "route" ? 0.86 : role === "branch" ? 0.34 + 0.42*t : 0.2 + 0.12*t,
   };
 }
-const titleFont =
-  "600 12.5px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
-const family = "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+const titleFont = `600 12.5px ${LENS_FONT_FAMILY}`;
 export function lensTypography(distance: number) {
   const near = Math.max(0, Math.min(1, 1 - distance));
   return {
@@ -306,6 +305,7 @@ export function placeLabels(
   measure: Measure,
   previous: ReadonlyMap<string, Label> = new Map(),
   moving = false,
+  family = LENS_FONT_FAMILY,
 ) {
   const labels: Label[] = [];
   const candidates = points
@@ -321,7 +321,7 @@ export function placeLabels(
     const distance = norm(p.p),
       typography = lensTypography(distance);
     const { detailSize, metaSize } = typography;
-    const weight = chosen ? 700 : 550;
+    const weight = chosen ? 600 : 500;
     const valueFont = `${detailSize}px ${family}`,
       metaFont = `${metaSize}px ${family}`;
     const brief = info.content
@@ -338,13 +338,13 @@ export function placeLabels(
     for (const variant of variants) {
       // Typeset once in a fixed coordinate system; scale that composition.
       // No 1/2/3-line or width switch at arbitrary lens radii.
-      const longestWord = Math.max(...caption.title.split(/\s+/).map(word => measure(word, `700 21px ${family}`)));
+      const longestWord = Math.max(...caption.title.split(/\s+/).map(word => measure(word, `600 21px ${family}`)));
       const baseWidth = Math.min(width - 24, Math.max(widths[variant], longestWord + 8));
       let baseSize = 21;
-      let lines = wrapText(caption.title, baseWidth - 8, measure, `700 ${baseSize}px ${family}`, Infinity);
+      let lines = wrapText(caption.title, baseWidth - 8, measure, `600 ${baseSize}px ${family}`, Infinity);
       while (lines.length > (n.kind === "finding" ? 4 : 3) && baseSize > 15) {
         baseSize--;
-        lines = wrapText(caption.title, baseWidth - 8, measure, `700 ${baseSize}px ${family}`, Infinity);
+        lines = wrapText(caption.title, baseWidth - 8, measure, `600 ${baseSize}px ${family}`, Infinity);
       }
       const titleSize = 11.5 + (baseSize - 11.5) * Math.max(0, 1 - distance) ** 0.8;
       const titleFont = `${weight} ${titleSize}px ${family}`;
