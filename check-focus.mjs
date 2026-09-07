@@ -276,7 +276,7 @@ for (const [width, height] of [
       assert.equal(b.contentLines.join(" "),b.content.replace(/\s+/g," "), "Displayed values must not be ellipsized");
       for(const line of b.contentLines)
         assert(measure(line,`${b.detailSize}px`) <= b.w-8+1e-6,"Full value fits at every lens distance");
-      assert(b.h >= 44);
+      assert(b.h >= (b.variant>=9?32:44), "Compact ink boxes are separate from 44px SVG hit areas");
       for (const other of boxes)
         if (other.id !== b.id) assert(!overlaps(b, other), "Label collision");
       const anchor = g.points.find((p) => p.id === b.id);

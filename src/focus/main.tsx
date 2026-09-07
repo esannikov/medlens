@@ -335,6 +335,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
             />
           ) : (
             <Lens
+              readerOpen={readerOpen}
               fontFamily={fontFamily}
               lm={lm}
               scope={scope}

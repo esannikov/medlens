@@ -16,6 +16,7 @@ import {
   keyboardDestination,
   structuralRelationNames,
   graphCaption,
+  overlaps,
   connectionStyle,
   nodeKinds,
   placeLabels,
@@ -26,6 +27,8 @@ import {
 import { NodeGlyph, NodeShape, StudyMark } from "./NodeGlyph";
 import { LENS_FONT_FAMILY } from "./typography.ts";
 import "./lens-upgrades.css";
+import {compassLayout} from './compass.ts';
+import {Compass} from './OrbitalCompass';
 
 export function Lens({
   lm,
@@ -44,6 +47,7 @@ export function Lens({
   sourceTrace = false,
   cameraTarget,
   onReadSource,
+  readerOpen=false,
 }: {
   lm: LensModel;
   selected: string;
@@ -61,6 +65,7 @@ export function Lens({
   sourceTrace?: boolean;
   cameraTarget?: string;
   onReadSource?: (id: string) => void;
+  readerOpen?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
     drag = useRef<{ x: number; y: number; focus: Vec; moved: boolean } | null>(
@@ -69,6 +74,7 @@ export function Lens({
     frame = useRef(0);
   const volumeId = `lens-volume-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const labelMemory = useRef(new Map<string, Label>());
+  const compassMemory=useRef(new Map<string,number>());
   const svg = useRef<SVGSVGElement>(null);
   const [coverageOpen, setCoverageOpen] = useState(false);
   const glint = useRef<SVGGElement>(null);
@@ -133,6 +139,8 @@ export function Lens({
     [lm, selected, scope, focus, size, zoom],
   );
   const { points, paths, radius, centerId } = geometry;
+  const readerObstacle=readerOpen&&size.width>700?[{x:size.width-380,y:0,w:380,h:size.height}]:[];
+  const compass=useMemo(()=>compassLayout(lm,scope,points,radius,size.width,size.height,measure,fontFamily,[],compassMemory.current),[lm,scope,points,radius,size,measure,fontFamily]);
   const labels = useMemo(
     () =>
       placeLabels(
@@ -147,12 +155,15 @@ export function Lens({
         labelMemory.current,
         moving,
         fontFamily,
-        { textScale, centerId, canonicalUnits },
+        { textScale, centerId, canonicalUnits, attentionId:hovered||undefined,
+          obstacles:readerObstacle,contextObstacles:compass.items.map(item=>item.bounds) },
       ),
     // Motion flags change feedback, not geometry. Pointerup must retain the
     // last rendered placement rather than start a second, unlocked layout.
-    [lm, selected, scope, points, paths, size, measure, fontFamily, textScale, centerId, canonicalUnits],
+    [lm, selected, scope, points, paths, size, measure, fontFamily, textScale, centerId, canonicalUnits, hovered, readerOpen, compass],
   );
+  useLayoutEffect(()=>{compassMemory.current.clear();},[size.width,size.height]);
+  useLayoutEffect(()=>{compass.items.forEach(item=>compassMemory.current.set(item.id,item.angle));},[compass]);
   // Reset before committing the new layout, not in a later passive effect.
   // Otherwise closing the reader erases the anchors needed by the first drag.
   useLayoutEffect(() => { labelMemory.current.clear(); }, [lm, size.width, size.height, scope, textScale, canonicalUnits]);
@@ -516,9 +527,9 @@ export function Lens({
                 >
                   <rect
                     x={b.x}
-                    y={b.y}
+                    y={b.y-Math.max(0,44-b.h)/2}
                     width={b.w}
-                    height={b.h}
+                    height={Math.max(44,b.h)}
                     fill="transparent"
                     className="label-hit-area"
                     aria-hidden="true"
@@ -580,6 +591,7 @@ export function Lens({
               );
             })}
           </g>
+          <Compass layout={compass} active={lm.groupFor(centerId)} obscured={compass.items.filter(item=>labels.some(b=>b.id===hovered&&overlaps(b,item.bounds,3))).map(item=>item.id)} onNavigate={id=>{drag.current=null;(onNavigate||onSelect)(id);}}/>
         </svg>
         {hoverNode && !labels.some(label=>label.id===hovered) && !moving && (
           <div className="lens-peek" role="status">

@@ -70,6 +70,11 @@
 .quiet-app .table-view { position: absolute; inset: 50px 0 0; }
 .quiet-app .search-popover { width: 100%; min-width: 320px; top: calc(100% + 8px); max-height: calc(100dvh - var(--bar-height) - 24px); }
 .quiet-app .search-heading h2 { font-size: 16px; }
+.lens-orbit-compass text { paint-order: stroke fill; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+.compass-cluster { cursor: pointer; }
+.compass-cluster:focus-visible { outline: none; }
+.compass-cluster:focus-visible .compass-hit { stroke: #6750a423; }
+.compass-cluster:hover text, .compass-cluster:focus-visible text { text-decoration: underline; }
 @media (max-width: 700px) {
   .quiet-app { --bar-height: 106px; }
   .quiet-bar { display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 6px 10px; padding: 8px 12px; }
