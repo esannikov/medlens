@@ -372,7 +372,7 @@ export function placeLabels(
   previous: ReadonlyMap<string, Label> = new Map(),
   moving = false,
   family = LENS_FONT_FAMILY,
-  options: { textScale?: number; centerId?: string; canonicalUnits?: boolean; attentionId?: string; obstacles?: Rect[]; contextObstacles?: Rect[] } = {},
+  options: { textScale?: number; centerId?: string; canonicalUnits?: boolean; attentionId?: string; obstacles?: Rect[]; contextObstacles?: Rect[]; allowedIds?:ReadonlySet<string>; pathIds?:ReadonlySet<string>; compactPeers?:boolean } = {},
 ) {
   const labels: Label[] = [];
   const textScale = Math.max(0.85, Math.min(1.6, options.textScale ?? 1));
@@ -380,12 +380,13 @@ export function placeLabels(
   const center = lm.nodes.get(centerId)!;
   const branchOwner = center.children.length ? center : lm.nodes.get(center.parent || centerId)!;
   const branch = new Set([branchOwner.id, ...branchOwner.children]);
-  const priority = (p: Point) => p.id === centerId ? 0 : p.id===options.attentionId ? 0.5 : branch.has(p.id) && ["clinical_event", "specimen", "group"].includes(lm.nodes.get(p.id)!.kind) ? 1 : branch.has(p.id) ? 2 : 3;
+  const priority = (p: Point) => p.id === centerId ? 0 : p.id===options.attentionId ? 0.5 : options.allowedIds&&['patient','group','clinical_event','specimen'].includes(lm.nodes.get(p.id)!.kind)?1+lm.nodes.get(p.id)!.depth*.02:branch.has(p.id) && ["clinical_event", "specimen", "group"].includes(lm.nodes.get(p.id)!.kind) ? 1 : branch.has(p.id) ? 2 : 3;
   const candidates = points
-    .filter((p) => p.active && (p.id===options.attentionId || norm(p.p) < (branch.has(p.id) ? 0.995 : 0.975)))
+    .filter((p) => p.active && (p.id===centerId || p.id===options.attentionId || options.pathIds?.has(p.id) || norm(p.p) < (branch.has(p.id)||options.allowedIds?.has(p.id) ? 0.995 : 0.975)))
+    .filter(p=>!options.allowedIds||options.allowedIds.has(p.id))
     .sort((a, b) => priority(a) - priority(b) || norm(a.p) - norm(b.p));
   for (const p of candidates) {
-    if (labels.length >= Math.max(width < 600 ? 12 : 24, branch.size + 3)) break;
+    if (labels.length >= Math.max(width < 600 ? 12 : 24, options.allowedIds?.size || branch.size + 3)) break;
     const n = lm.nodes.get(p.id)!,
       info = preview(lm, n, scope, options.canonicalUnits),
       chosen = p.id === selected,
@@ -406,7 +407,7 @@ export function placeLabels(
     // redundant navigation metadata yields to space around the center node.
     const attention=p.id===options.attentionId;
     const availableVariants = centered || attention ? [3, 4, 5, 6, 7, 8, 0, 1, 2]
-      : branch.has(p.id) ? [0, 1, 2, 9, 10] : [0, 1, 2];
+      : options.compactPeers ? [9,10,0,1,2] : branch.has(p.id) ? [0, 1, 2, 9, 10] : [0, 1, 2];
     const rememberedVariant = remembered && availableVariants.includes(remembered.variant) ? remembered.variant : null;
     const variants = remembered
       ? moving && !centered && rememberedVariant !== null ? [rememberedVariant, ...availableVariants.filter(i=>i>=9&&i!==rememberedVariant)]
@@ -557,7 +558,7 @@ export function placeLabels(
       trials.sort((a,b) => remembered
         ? Math.hypot(a.x - remembered.x, a.y - remembered.y) - Math.hypot(b.x - remembered.x, b.y - remembered.y)
         : breathingRoom(b) - breathingRoom(a) + 10 * (quietness(b) - quietness(a)));
-      const allowOwn = centered || attention || branch.has(p.id) || n.kind !== "observation";
+      const allowOwn = centered || attention || branch.has(p.id) || options.allowedIds?.has(p.id) || n.kind !== "observation";
       const box = trials.find(b => b.anchor === remembered?.anchor && clear(b, !allowOwn)) ||
         trials.find((b) => clear(b, true)) || (allowOwn ? trials.find((b) => clear(b, false)) : undefined);
       if (!box) continue;
@@ -572,7 +573,7 @@ export function placeLabels(
         variant,
         nodeX: p.x,
         nodeY: p.y,
-        opacity: branch.has(p.id) || attention ? 1 : Math.min(1, Math.max(0, (0.975 - distance) / 0.035)),
+        opacity: branch.has(p.id) || attention || options.allowedIds?.has(p.id) ? 1 : Math.min(1, Math.max(0, (0.975 - distance) / 0.035)),
         id: p.id,
         lines,
         meta,

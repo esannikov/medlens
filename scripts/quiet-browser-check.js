@@ -27,6 +27,7 @@ async (page) => {
     });
     await page.mouse.move(d.x,d.y);await page.mouse.down();
     await page.mouse.move(d.x+d.dx,d.y+d.dy,{steps:22});
+    await page.waitForTimeout(220); // A stable target commits while still dragging.
     check(await focus()===id&&await reader()===id,'Reader follows during drag: '+id);
     await page.mouse.up();await page.waitForTimeout(100);
     check(await focus()===id&&await reader()===id,'Reader follows after drag: '+id);

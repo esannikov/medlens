@@ -29,6 +29,8 @@ import { LENS_FONT_FAMILY } from "./typography.ts";
 import "./lens-upgrades.css";
 import {compassLayout} from './compass.ts';
 import {Compass} from './OrbitalCompass';
+import {buildRevealPlan,connectedLabels} from './reveal.ts';
+import {useReadingFocus} from './useReadingFocus';
 
 export function Lens({
   lm,
@@ -105,6 +107,7 @@ export function Lens({
   }, []);
   useEffect(() => {
     drag.current = null;
+    setHovered(null);
     const from = currentFocus.current,
       target = lm.nodes.get(cameraTarget || selected)!.p2;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -138,13 +141,19 @@ export function Lens({
       lensGeometry(lm, selected, scope, focus, size.width, size.height, zoom),
     [lm, selected, scope, focus, size, zoom],
   );
-  const { points, paths, radius, centerId } = geometry;
+  const {points,radius,centerId:geometricFocusId}=geometry;
+  const centerId=useReadingFocus(lm,scope,points,geometricFocusId,cameraTarget||selected,centerKey,moving&&!drag.current?.moved);
+  const reveal=useMemo(()=>buildRevealPlan(lm,centerId,scope,points,size.width,hovered),[lm,centerId,scope,points,size.width,hovered]);
+  const paths=useMemo(()=>geometry.paths.map(path=>({...path,
+    local:reveal.allowedIds.has(path.source)&&reveal.allowedIds.has(path.target),
+    ancestor:reveal.pathIds.has(path.source)&&reveal.pathIds.has(path.target)
+  })),[geometry.paths,reveal]);
   const activeGroup=lm.groupFor(centerId);
   const readerObstacle=readerOpen&&size.width>700?[{x:size.width-380,y:0,w:380,h:size.height}]:[];
   const compass=useMemo(()=>compassLayout(lm,scope,points,radius,size.width,size.height,measure,fontFamily,[],compassMemory.current,activeGroup),[lm,scope,points,radius,size,measure,fontFamily,activeGroup]);
   const labels = useMemo(
     () =>
-      placeLabels(
+      connectedLabels(lm,reveal,placeLabels(
         lm,
         centerId,
         scope,
@@ -157,11 +166,12 @@ export function Lens({
         moving,
         fontFamily,
         { textScale, centerId, canonicalUnits, attentionId:hovered||undefined,
-          obstacles:readerObstacle,contextObstacles:compass.items.map(item=>item.bounds) },
-      ),
+          obstacles:readerObstacle,contextObstacles:compass.items.map(item=>item.bounds),
+          allowedIds:reveal.allowedIds,pathIds:reveal.pathIds,compactPeers:true },
+      ),hovered),
     // Motion flags change feedback, not geometry. Pointerup must retain the
     // last rendered placement rather than start a second, unlocked layout.
-    [lm, selected, scope, points, paths, size, measure, fontFamily, textScale, centerId, canonicalUnits, hovered, readerOpen, compass],
+    [lm, selected, scope, points, paths, size, measure, fontFamily, textScale, centerId, canonicalUnits, hovered, readerOpen, compass,reveal],
   );
   useLayoutEffect(()=>{compassMemory.current.clear();},[size.width,size.height]);
   useLayoutEffect(()=>{compass.items.forEach(item=>compassMemory.current.set(item.id,item.angle));},[compass]);
@@ -171,16 +181,15 @@ export function Lens({
   useLayoutEffect(() => {
     labels.forEach(label => labelMemory.current.set(label.id, label));
   }, [labels]);
-  useEffect(() => { if (!moving || drag.current?.moved) onFocusChange(centerId); }, [centerId, moving, onFocusChange]);
+  useLayoutEffect(() => { onFocusChange(centerId); }, [centerId, onFocusChange]);
   const hoverNode = hovered ? lm.nodes.get(hovered) : null;
   const focusNode = lm.nodes.get(centerId)!,
     info = preview(lm, focusNode, scope, canonicalUnits);
   const highlighted = new Set(
     lm.ancestors(hovered || centerId).map((n) => n.id),
   );
-  const branchRoot = focusNode.children.length ? focusNode : lm.nodes.get(focusNode.parent || centerId)!;
-  const branch = new Set(branchRoot.id === lm.root
-    ? [lm.root, ...branchRoot.children] : [branchRoot.id, ...branchRoot.descendants]);
+  const branch = reveal.branchIds;
+  const labelIds=new Set(labels.map(b=>b.id));
   const pointsById = new Map(points.map(p => [p.id,p]));
   const coverage = activeResultCoverage(lm, centerId, scope, labels);
   const coverageOwnerId = coverage?.owner.id;
@@ -201,7 +210,9 @@ export function Lens({
     const from=pointsById.get(path.source)!, to=pointsById.get(path.target)!;
     const role = from.active && to.active && highlighted.has(path.source) && highlighted.has(path.target)
       ? "route" : from.active && to.active && branch.has(path.source) && branch.has(path.target) ? "branch" : "context";
-    return {...path, role, ...connectionStyle(1-Math.min(norm(from.p),norm(to.p)),role,"balanced"),
+    const style=connectionStyle(1-Math.min(norm(from.p),norm(to.p)),role,"balanced");
+    const namedPath=labelIds.has(path.target)&&reveal.allowedIds.has(path.source)||reveal.previewIds.has(path.source)&&reveal.previewIds.has(path.target);
+    return {...path, role, ...style,opacity:namedPath?Math.max(.62,style.opacity):role==='context'?.12:style.opacity,
       d:path.points.map(([x,y],i)=>`${i ? "L" : "M"}${x},${y}`).join(" ")};
   });
   const playGlint = () => {
@@ -257,7 +268,7 @@ export function Lens({
     }
   };
   return (
-    <section className="lens-view lens-upgraded" aria-label="Лінза досьє" data-focus-caption={centerId} data-text-scale={textScale} data-unit-mode={canonicalUnits ? "canonical" : "source"}>
+    <section className="lens-view lens-upgraded" aria-label="Лінза досьє" data-focus-caption={centerId} data-geometric-focus={geometricFocusId} data-reveal-owner={reveal.ownerId} data-reveal-allowed={Array.from(reveal.allowedIds).join(' ')} data-text-scale={textScale} data-unit-mode={canonicalUnits ? "canonical" : "source"}>
       {info.time && !labels.find(label=>label.id===centerId)?.dateLines.length && <span className="lens-date-context">{info.time}</span>}
       <div className="lens" ref={host} data-lens-mode="2d" data-moving={moving}>
         <svg
@@ -270,7 +281,7 @@ export function Lens({
           aria-label="Інтерактивна 2D-лінза графа"
           aria-describedby={`${volumeId}-keyboard`}
           onKeyDown={e => {
-            const keyboardTarget=moving ? (cameraTarget || selected) : centerId;
+            const keyboardTarget=centerId;
             handleNavigation(e, keyboardTarget);
             if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
               e.preventDefault();
@@ -279,6 +290,7 @@ export function Lens({
           }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
+            setHovered(null);
             cancelAnimationFrame(frame.current);
             drag.current = {
               x: e.clientX,
@@ -288,6 +300,12 @@ export function Lens({
             };
           }}
           onPointerMove={(e) => {
+            if(!e.buttons){
+              drag.current=null;
+              const target=(e.target as Element).closest('[data-lens-node],[data-label-for]');
+              setHovered(target?.getAttribute('data-lens-node')||target?.getAttribute('data-label-for')||null);
+              return;
+            }
             const d = drag.current;
             if (!d || !e.buttons) return;
             if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) {
@@ -436,7 +454,7 @@ export function Lens({
                   className="node-target"
                   transform={`translate(${p.x} ${p.y})`}
                   onClick={() => choose(p.id)}
-                  onMouseEnter={() => !moving && setHovered(p.id)}
+                  onMouseEnter={() => !moving && !drag.current?.moved && setHovered(p.id)}
                   onMouseLeave={() => setHovered(null)}
                   role="button"
                   tabIndex={-1}
@@ -465,7 +483,7 @@ export function Lens({
                   )}
                   <g
                     data-node-mark="true"
-                    opacity={p.active ? (expanded ? 1 : 0.68) : 0.14}
+                    opacity={p.active ? (reveal.allowedIds.has(p.id)?(expanded?1:.68):.28) : 0.14}
                   >
                     {p.active && (branch.has(p.id) || highlighted.has(p.id)) && expanded && <circle r={p.radius+3.5} fill={n.color} opacity="0.09" />}
                     {expanded || n.kind === "clinical_event" || n.kind === "group" ? (
@@ -493,7 +511,7 @@ export function Lens({
               );
             })}
           </g>
-          <g className="lens-labels">
+          <g className="lens-labels reveal-cohort" key={reveal.ownerId}>
             {labels.map((b) => {
               const n = lm.nodes.get(b.id)!,
                 content = preview(lm, n, scope, canonicalUnits);
