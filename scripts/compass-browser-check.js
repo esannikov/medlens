@@ -7,6 +7,7 @@ async(page)=>{
  await page.setViewportSize({width:1440,height:1000});await enter();
  const resultIds=await page.locator('.lens-coverage').getAttribute('data-coverage-result-ids');
  const ids=resultIds.split(' ');check(ids.length===27,'All 27 punctate results remain present');
+ check(await page.locator('[data-compass-cluster="group:laboratory_panel"]').count()===0,'Active section is absent while reading its specimen');
  const bare=await page.locator('.lens-coverage').getAttribute('data-coverage-visible-ids');
  check(bare.split(' ').length>=12,'At least the original readable content remains beside the compass');
  const failures=[];
@@ -20,11 +21,14 @@ async(page)=>{
  const before=await page.locator('[data-compass-cluster]').evaluateAll(els=>els.map(el=>el.getAttribute('data-compass-bearing')));
  await page.locator('[data-compass-cluster="group:pathology_procedure"] text').click();await settle();
  check(await page.locator('.lens-view').getAttribute('data-focus-caption')==='group:pathology_procedure','Compass text navigates to its cluster');
+ check(await page.locator('[data-compass-cluster="group:pathology_procedure"]').count()===0,'Current morphology direction disappears');
  const after=await page.locator('[data-compass-cluster]').evaluateAll(els=>els.map(el=>el.getAttribute('data-compass-bearing')));
  check(JSON.stringify(before)!==JSON.stringify(after),'Directions change with the lens transform');
  await page.locator('[data-compass-cluster="group:laboratory_panel"]').focus();await page.keyboard.press('Enter');await settle();
  check(await page.locator('.lens-view').getAttribute('data-focus-caption')==='group:laboratory_panel','Compass keyboard navigation');
+ check(await page.locator('[data-compass-cluster="group:laboratory_panel"]').count()===0,'Current laboratory direction disappears');
  await page.getByRole('button',{name:'До всього досьє'}).click();await settle();await page.screenshot({path:'output/playwright/compass-root.png'});
+ check(await page.locator('[data-compass-cluster]').count()===4,'All directions return in the dossier overview');
  const directions=()=>page.locator('[data-compass-cluster]').evaluateAll(els=>els.map(el=>el.getAttribute('data-compass-bearing')));
  const prior=await directions(),box=await page.locator('.lens-svg').boundingBox();
  const radius=await page.locator('.lens-boundary').getAttribute('r');
@@ -38,7 +42,7 @@ async(page)=>{
    const a=await g();await page.getByRole('button',{name:'Дані',exact:true}).click();const b=await g();
    check(JSON.stringify(a)===JSON.stringify(b),'Reader keeps stable lens: '+size.width);
    await page.getByRole('button',{name:'Закрити запис',exact:true}).click();
-   check(await page.locator('[data-compass-cluster]').count()===4,'Four compass clusters: '+size.width);
+   check(await page.locator('[data-compass-cluster]').count()===3,'Only other compass clusters: '+size.width);
    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No viewport overflow: '+size.width);
    if(size.width===390)await page.screenshot({path:'output/playwright/compass-mobile.png'});
  }

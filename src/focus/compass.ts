@@ -12,11 +12,13 @@ export function orbitArc(cx:number,cy:number,r:number,from:number,to:number){
 
 /** True bearings and independently spaced captions. Labels may separate along
  * the orbit, but the coloured ticks always retain the projected direction. */
-export function compassLayout(lm:LensModel,scope:Scope,points:Point[],radius:number,width:number,height:number,measure:Measure,family:string,obstacles:Rect[]=[],previous:ReadonlyMap<string,number>=new Map()){
+export function compassLayout(lm:LensModel,scope:Scope,points:Point[],radius:number,width:number,height:number,measure:Measure,family:string,obstacles:Rect[]=[],previous:ReadonlyMap<string,number>=new Map(),activeGroup:string|null=null){
   const cx=width/2,cy=height/2,ring=radius+(width<600?5:18);
   const fontSize=width<600?10.5:12;
   const byId=new Map(points.map(p=>[p.id,p]));
-  const items=lm.groups.filter(id=>lm.contextual(id,scope)).map(id=>{
+  // The current section is already represented inside the lens. Removing it
+  // before placement also removes its bearing, connector and reserved space.
+  const items=lm.groups.filter(id=>id!==activeGroup&&lm.contextual(id,scope)).map(id=>{
     const n=lm.nodes.get(id)!,p=byId.get(id)!;
     let dx=p.x-cx,dy=p.y-cy;
     if(Math.hypot(dx,dy)<radius*.08){

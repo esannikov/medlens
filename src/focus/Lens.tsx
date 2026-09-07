@@ -139,8 +139,9 @@ export function Lens({
     [lm, selected, scope, focus, size, zoom],
   );
   const { points, paths, radius, centerId } = geometry;
+  const activeGroup=lm.groupFor(centerId);
   const readerObstacle=readerOpen&&size.width>700?[{x:size.width-380,y:0,w:380,h:size.height}]:[];
-  const compass=useMemo(()=>compassLayout(lm,scope,points,radius,size.width,size.height,measure,fontFamily,[],compassMemory.current),[lm,scope,points,radius,size,measure,fontFamily]);
+  const compass=useMemo(()=>compassLayout(lm,scope,points,radius,size.width,size.height,measure,fontFamily,[],compassMemory.current,activeGroup),[lm,scope,points,radius,size,measure,fontFamily,activeGroup]);
   const labels = useMemo(
     () =>
       placeLabels(
