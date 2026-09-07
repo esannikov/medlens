@@ -1,62 +1,13 @@
-import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { date, kindNames, label, value } from "../model.ts";
-import { type LensModel, type LensNode, type Scope } from "../focus/model.ts";
-import { LENS_FONT_FAMILY } from "../focus/typography.ts";
-import { Lens } from "../focus/Lens.tsx";
-import { pairedStudyMembers, experimentUrl, explicitStudyComparisons, isExperimentVariant, paneVariants,
-  regroupLayout, regroupObjects, scopedObjects, studyMembers,
-  type ExperimentVariant, type PaneVariant, type RegroupBy } from "./model.ts";
+import {useMemo,useState,type CSSProperties,type KeyboardEvent} from "react";
+import {date,kindNames,label,value} from "../model.ts";
+import type {LensModel,LensNode,Scope} from "../focus/model.ts";
+import {LENS_FONT_FAMILY} from "../focus/typography.ts";
+import {regroupLayout,regroupObjects,scopedObjects,type RegroupBy} from "./model.ts";
 import "./experiments.css";
 
-const variantNames: Record<ExperimentVariant, string> = {
-  dual: "Дві пов’язані лінзи", regroup: "Перегрупування", lab: "Порівняти поруч",
-};
-const paneNames: Record<PaneVariant, string> = {
-  "2d": "Основна лінза", control: "Контроль: до змін", dual: "Дві пов’язані лінзи", regroup: "Перегрупування",
-};
-
-export type ExperimentsProps = {
-  lm: LensModel;
-  scope: Scope;
-  fontFamily?: string;
-  initialVariant?: ExperimentVariant;
-  onExit?: () => void;
-};
-
-export function Experiments({ lm, scope, fontFamily = LENS_FONT_FAMILY,
-  initialVariant = "dual", onExit }: ExperimentsProps) {
-  const embedded = new URLSearchParams(window.location.search).get("embed") === "1";
-  const allowedVariant = (v: ExperimentVariant) => embedded && v === "lab" ? "dual" : v;
-  const [variant, setVariant] = useState<ExperimentVariant>(() => allowedVariant(initialVariant));
-  useEffect(() => setVariant(allowedVariant(initialVariant)), [initialVariant, embedded]);
-  useEffect(() => {
-    const restore = () => {
-      const next = new URLSearchParams(window.location.search).get("lens");
-      if (isExperimentVariant(next)) setVariant(allowedVariant(next));
-    };
-    window.addEventListener("popstate", restore);
-    return () => window.removeEventListener("popstate", restore);
-  }, [embedded]);
-  const choose = (next: ExperimentVariant) => {
-    setVariant(allowedVariant(next));
-    window.history.replaceState(null, "", experimentUrl(allowedVariant(next), window.location.href, embedded));
-  };
-  return <section className={`experiments exp-${variant}`} style={{ "--exp-font": fontFamily } as CSSProperties}
-    aria-label="Експериментальні лінзи">
-    <header className="exp-heading">
-      <div><h2>Експериментальні лінзи</h2><p>Той самий знімок {lm.data.case_id}. Варіанти організації та читання записів.</p></div>
-      {onExit ? <button type="button" onClick={onExit}>До основної лінзи</button>
-        : <a href={experimentUrl("2d", window.location.href, embedded)}>До основної лінзи</a>}
-    </header>
-    <nav className="exp-tabs" aria-label="Варіант експерименту">
-      {(Object.keys(variantNames) as ExperimentVariant[]).filter(v => !embedded || v !== "lab").map(v =>
-        <button key={v} type="button" aria-pressed={variant === v} onClick={() => choose(v)}>{variantNames[v]}</button>)}
-    </nav>
-    {variant === "dual" ? <DualFocus lm={lm} scope={scope} fontFamily={fontFamily} />
-      : variant === "regroup" ? <RegroupView lm={lm} scope={scope} /> : <ComparisonLab lm={lm} />}
-  </section>;
+export default function Experiments({lm,scope,fontFamily=LENS_FONT_FAMILY,onExit}:{lm:LensModel;scope:Scope;fontFamily?:string;initialVariant?:"regroup";onExit?:()=>void}){
+ return <section className="experiments exp-regroup" style={{"--exp-font":fontFamily} as CSSProperties}><header className="exp-heading"><h2>Перегрупування записів</h2><button onClick={onExit}>До лінзи</button></header><RegroupView lm={lm} scope={scope}/></section>;
 }
-export default Experiments;
 
 function keyActivate(event: KeyboardEvent<SVGGElement>, action: () => void) {
   if (event.key === "Enter" || event.key === " ") { event.preventDefault(); action(); }
@@ -100,81 +51,6 @@ function MemberList({ lm, nodes, selected, onSelect, label: listLabel }: {
       </button>
     </li>)}
   </ol>;
-}
-
-function DualFocus({ lm, scope, fontFamily }: { lm: LensModel; scope: Scope; fontFamily: string }) {
-  const studies = useMemo(() => scopedObjects(lm, scope).filter(n => n.kind === "clinical_event"), [lm, scope]);
-  const [chosen, setChosen] = useState<[string, string]>(["", ""]);
-  const [opened, setOpened] = useState<[string, string]>(["", ""]);
-  const [focused, setFocused] = useState<[string, string]>(["", ""]);
-  const first = studies.some(n => n.id === chosen[0]) ? chosen[0] : studies[0]?.id || "";
-  const second = studies.some(n => n.id === chosen[1]) ? chosen[1]
-    : studies.find(n => n.id !== first)?.id || "";
-  const ids: [string, string] = [first, second];
-  const poles = useMemo(() => pairedStudyMembers(lm, ids, scope), [lm, first, second, scope]);
-  const comparisons = useMemo(() => explicitStudyComparisons(lm, first, second, scope), [lm, first, second, scope]);
-  const [comparisonId, setComparisonId] = useState<string | null>(null);
-  const open = (pole: number, id: string) => {
-    const node = lm.nodes.get(id);
-    if (!node || !lm.contextual(id, scope)) return;
-    setFocused(prev => pole === 0 ? [id, prev[1]] : [prev[0], id]);
-    if (!node.object || !lm.eligible(id, scope)) return;
-    setOpened(prev => pole === 0 ? [id, prev[1]] : [prev[0], id]);
-    const study = lm.eventFor(node);
-    if (study && lm.eligible(study.object_id, scope)) {
-      setChosen(prev => pole === 0 ? [study.object_id, prev[1] || second] : [prev[0] || first, study.object_id]);
-      setComparisonId(null);
-    }
-  };
-  const selectStudy = (pole: number, id: string) => {
-    setChosen(pole === 0 ? [id, second] : [first, id]);
-    setOpened(prev => pole === 0 ? [id, prev[1]] : [prev[0], id]);
-    setFocused(prev => pole === 0 ? [id, prev[1]] : [prev[0], id]);
-    setComparisonId(null);
-  };
-  if (studies.length < 2) return <div className="exp-empty" role="status">
-    <h3>Для двох фокусів потрібно два дослідження</h3>
-    <p>Поточний відбір містить {studies.length}. Розширте часовий або категорійний відбір в основних контролах.</p>
-    {studies[0] && <><h4>{studies[0].title}</h4><MemberList lm={lm} nodes={studyMembers(lm, studies[0].id, scope)}
-      selected={opened[0]} onSelect={id => open(0, id)} label="Усі доступні записи дослідження" />
-      <ObjectRead lm={lm} node={studyMembers(lm, studies[0].id, scope).find(n => n.id === opened[0])} /></>}
-  </div>;
-  return <div className="exp-dual-view">
-    <p className="exp-explanation">Дві незалежні лінзи зі спільним відбором. Перетягуйте кожну, щоб наблизити записи;
-      натискання відкриває дані у відповідній колонці. Автоматичного зіставлення клінічних сутностей немає.</p>
-    <div className="exp-study-pickers">{ids.map((id, pole) => <label key={pole}>
-      <span>Фокус {pole === 0 ? "A" : "B"}</span>
-      <select value={id} onChange={e => selectStudy(pole, e.target.value)}>
-        {studies.map(study => <option key={study.id} value={study.id}>{lm.times.get(study.id)?.text} · {study.title}</option>)}
-      </select>
-    </label>)}</div>
-    <div className="exp-linked-lenses">{poles.map((pole, index) => {
-      const focusId = lm.nodes.has(focused[index]) && lm.contextual(focused[index], scope) ? focused[index] : pole.id;
-      return <section key={index} className="exp-linked-lens" aria-label={`Лінза ${index === 0 ? "A" : "B"}`}>
-        <h3>Лінза {index === 0 ? "A" : "B"} · {lm.nodes.get(pole.id)!.title}</h3>
-        <Lens lm={lm} selected={focusId} pinned={null} scope={scope} centerKey={0} fontFamily={fontFamily}
-          onSelect={id => open(index, id)} onRead={id => open(index, id)} onFocusChange={() => {}} />
-      </section>;
-    })}</div>
-    <p className="exp-coverage" role="status">Повні списки обраних досліджень: A — {poles[0].nodes.length} / {poles[0].nodes.length}, B — {poles[1].nodes.length} / {poles[1].nodes.length} доступних записів.
-      Нижче включено дослідження, матеріал і результати. Кожна лінза окремо показує покриття активної гілки.</p>
-    <div className="exp-comparison-state"><strong>Явні часові порівняння в пакеті: {comparisons.length}</strong>
-      {comparisons.length ? <div>{comparisons.map(n => <button key={n.id} type="button" onClick={() => setComparisonId(n.id)}>{n.title}</button>)}</div>
-        : <p>Для цієї пари в поточному відборі немає явних зв’язків з підтвердженими посиланнями на обидва дослідження.</p>}
-      {comparisons.some(n => n.id === comparisonId) && <ObjectRead lm={lm} node={lm.nodes.get(comparisonId!)} />}
-    </div>
-    <div className="exp-dual-columns">{poles.map((pole, index) => {
-      const selected = lm.nodes.get(opened[index])?.object && lm.eligible(opened[index], scope) ? opened[index] : pole.id;
-      return <section key={index} aria-label={`Фокус ${index === 0 ? "A" : "B"}`}>
-        <h3>Фокус {index === 0 ? "A" : "B"} · {lm.nodes.get(pole.id)!.title}</h3>
-        <div className="exp-reading-window" tabIndex={0} aria-label={`Дані відкритого запису фокуса ${index === 0 ? "A" : "B"}`}>
-          <ObjectRead lm={lm} node={lm.nodes.get(selected)} />
-        </div>
-        <h4>Усі записи дослідження · {pole.nodes.length}</h4>
-        <MemberList lm={lm} nodes={pole.nodes} selected={selected} onSelect={id => open(index, id)} label={`Повний список фокуса ${index === 0 ? "A" : "B"}`} />
-      </section>;
-    })}</div>
-  </div>;
 }
 
 function RegroupView({ lm, scope }: { lm: LensModel; scope: Scope }) {
@@ -228,24 +104,5 @@ function RegroupView({ lm, scope }: { lm: LensModel; scope: Scope }) {
           <MemberList lm={lm} nodes={group.nodes} selected={activeId} onSelect={setSelected} label={`Повний список: ${group.title}`} />
         </details>)}</div>
       </>}
-  </div>;
-}
-
-function ComparisonLab({ lm }: { lm: LensModel }) {
-  const [panes, setPanes] = useState<[PaneVariant, PaneVariant]>(["control", "2d"]);
-  return <div className="exp-lab-view">
-    <p className="exp-explanation">Оберіть два варіанти. Кожна панель має власні фокус, фільтри та відкритий запис.
-      Для зіставлення встановіть однаковий відбір у двох панелях.</p>
-    <p className="exp-note">Один опублікований знімок {lm.data.case_id} · ревізія {lm.data.graph_hash.slice(0, 12)}.</p>
-    <div className="exp-lab-panes">{panes.map((variant, index) => <section key={index} className="exp-lab-pane" aria-label={`Панель ${index === 0 ? "A" : "B"}`}>
-      <header><label><span>Панель {index === 0 ? "A" : "B"}</span>
-        <select value={variant} onChange={e => setPanes(prev => index === 0 ? [e.target.value as PaneVariant, prev[1]] : [prev[0], e.target.value as PaneVariant])}>
-          {paneVariants.map(v => <option key={v} value={v}>{paneNames[v]}</option>)}
-        </select></label>
-        <a href={experimentUrl(variant, window.location.href)} target="_blank" rel="noopener noreferrer">Відкрити окремо</a>
-      </header>
-      <iframe key={variant} title={`Панель ${index === 0 ? "A" : "B"}: ${paneNames[variant]}`}
-        src={experimentUrl(variant, window.location.href, true)} referrerPolicy="no-referrer" />
-    </section>)}</div>
   </div>;
 }

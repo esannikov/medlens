@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const source=path=>readFileSync(new URL(path,import.meta.url),'utf8');
+const app=source('./src/focus/main.tsx'),lens=source('./src/focus/Lens.tsx'),time=source('./src/focus/Timeline.tsx');
+assert.match(app,/const displayId=mode==='2d'\?navigationId:selected/);
+assert.match(app,/data-reader-object=\{displayId\}/);
+assert.match(app,/sourceOwner.current===displayId\?sourceId:null/);
+assert.match(app,/advancedOpen&&node.object&&selectedEligible&&<RecordInsights/);
+for(const removed of ['reader-context-switch','rail-tabs','nearby-records','graph-foot','pinned-stripe'])assert(!app.includes(`className="${removed}"`),removed);
+for(const removed of ['lens-key','lens-compass','lens-relations','lens-orientation'])assert(!lens.includes(`className="${removed}"`),removed);
+assert(!/ComparisonLab|DualFocus|<iframe/.test(source('./src/experiments/Experiments.tsx')));
+assert(!/Зафіксувати|onBaseline|Порівнян/.test(time));
+assert.match(source('./src/focus/quiet.css'),/\.quiet-app \.lens-view \.lens \{ position: absolute; inset: 0;/);
+assert.match(source('./src/focus/quiet.css'),/\.quiet-app \.reader-open \.focus-rail \{ display: flex; position: absolute;/);
+console.log('Quiet shell PASS: single focused reader, guarded source owner, removed comparison and legends, overlay layout. Browser geometry/pan checks are in scripts/quiet-browser-check.js.');

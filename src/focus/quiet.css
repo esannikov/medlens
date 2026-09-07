@@ -1,0 +1,93 @@
+/* The viewport is the only layout input to the lens. Panels never own a track. */
+.quiet-app { --bar-height: 64px; position: relative; height: 100dvh; min-height: 360px; overflow: hidden; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.quiet-bar { position: relative; z-index: 40; display: flex; align-items: center; gap: 14px; height: var(--bar-height); padding: 10px 20px; border-bottom: 1px solid #eee8f2; background: var(--paper); }
+.quiet-bar .brand { gap: 7px; padding: 4px 0; border: 0; background: none; }
+.quiet-bar h1 { font-size: 13px; font-weight: 500; color: #655971; margin: 0 14px 0 0; white-space: nowrap; }
+.quiet-bar .search-anchor { flex: 1; max-width: 720px; margin: 0 auto 0 0; }
+.quiet-bar .focus-search { min-height: 38px; height: 38px; background: #faf8fc; }
+.quiet-bar .focus-search input { font-size: 14px; }
+.quiet-bar > button { min-height: 38px; padding: 7px 10px; font-size: 13px; background: transparent; border-color: transparent; }
+.quiet-bar > button[aria-expanded=true] { background: var(--soft); }
+.more-control { position: relative; }
+.more-control > summary { cursor: pointer; padding: 9px; font-size: 13px; color: var(--purple); }
+.more-panel { position: absolute; right: 0; top: calc(100% + 8px); width: 280px; max-height: calc(100dvh - 90px); overflow: auto; padding: 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px #302b391a; }
+.more-panel nav { display: flex; gap: 6px; margin-bottom: 18px; }
+.more-panel nav button { flex: 1; }
+.more-panel nav button[aria-pressed=true] { background: var(--soft); }
+.more-panel > label { display: flex; align-items: center; gap: 9px; margin: 14px 0; font-size: 13px; }
+.more-panel > label > select { min-width: 0; flex: 1; }
+.more-action { display: block; width: 100%; text-align: left; margin: 6px 0; font-size: 12px; }
+.more-panel .places-panel { position: static; width: auto; border: 0; box-shadow: none; padding: 12px 0 0; }
+.demo-note { font-size: 11px; margin: 16px 0 0; }
+.quiet-app > .focus-workspace { position: absolute; top: var(--bar-height); bottom: 0; left: 0; right: 0; display: block; min-height: 0; height: auto; overflow: hidden; }
+.quiet-app .graph-workspace { position: absolute; inset: 0; height: 100%; min-height: 0; display: block; overflow: hidden; }
+.quiet-app .lens-view { position: absolute; inset: 0; display: block; margin: 0; padding: 0; }
+.quiet-app .lens-view .lens { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; }
+.quiet-app .lens-svg { width: 100%; height: 100%; display: block; }
+.quiet-app .focus-breadcrumb { position: absolute; top: 8px; left: 14px; right: auto; max-width: calc(100% - 28px); height: 34px; min-height: 0; padding: 0; z-index: 6; border: 0; background: transparent; gap: 8px; }
+.quiet-app .focus-breadcrumb button { font-size: 12px; min-height: 30px; background: transparent; border-color: transparent; }
+.quiet-app .focus-breadcrumb > div { overflow-x: auto; }
+.quiet-app .reset-focus { display: none; }
+.quiet-app .lens-date-context { position: absolute; top: 45px; left: 24px; z-index: 4; font: 12px var(--lens-font); color: #665770; max-width: calc(100% - 48px); pointer-events: none; }
+.quiet-app .lens-zoom { left: 18px; bottom: 18px; z-index: 7; gap: 4px; }
+.quiet-app .lens-zoom > button { background: var(--paper); min-width: 38px; min-height: 38px; padding: 6px 9px; }
+.quiet-app .lens-navigation-menu { display: none; }
+.quiet-app .lens-coverage { position: absolute; z-index: 8; bottom: 18px; right: 18px; border: 0; background: transparent; }
+.quiet-app .lens-coverage-summary { min-height: 0; padding: 0; }
+.quiet-app .lens-coverage-summary > button { min-height: 38px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); font-size: 12px; }
+.quiet-app .lens-coverage-content { left: auto; right: 0; bottom: calc(100% + 8px); width: min(430px, calc(100vw - 36px)); max-height: min(480px, 65dvh); padding: 14px; }
+.quiet-app .lens-coverage-content li > button { color: var(--ink); }
+.quiet-app .lens-coverage-content p { font-size: 13px; color: var(--ink); }
+.quiet-app .focus-rail { display: none; }
+.quiet-app .reader-open .focus-rail { display: flex; position: absolute; z-index: 20; top: 8px; right: 10px; bottom: 10px; left: auto; width: 360px; height: auto; min-height: 0; max-height: none; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px #302b391c; background: var(--paper); overflow: hidden; }
+.quiet-app .rail-header { padding: 20px 18px 12px; align-items: start; gap: 12px; }
+.quiet-app .rail-header h2 { font-size: 22px; font-weight: 600; line-height: 1.3; }
+.quiet-app .close-reader { min-height: 34px; min-width: 34px; border-color: transparent; background: none; font-size: 20px; flex-shrink: 0; }
+.quiet-app .study-return { padding: 0 18px 14px; border: 0; background: transparent; }
+.quiet-app .study-return > svg, .quiet-app .study-return > b { display: none; }
+.quiet-app .study-return span { font-size: 0; }
+.quiet-app .study-return strong { font-size: 12px; font-weight: 400; color: #6b5e74; margin: 0; }
+.quiet-app .study-return small { display: none; }
+.quiet-app .rail-tabs { min-height: 36px; }
+.quiet-app .rail-tabs button { font-size: 12px; padding: 7px 12px; min-height: 36px; }
+.quiet-app .rail-content { padding: 18px; }
+.quiet-app .result-value { font-size: 36px; margin: 2px 0 22px; }
+.quiet-app .result-value > span { font-size: 16px; margin-left: 7px; }
+.quiet-app .object-detail dl { font-size: 13px; line-height: 1.5; }
+.quiet-app .source-links button { padding: 12px 0; font-size: 12px; }
+.quiet-app .object-detail > details, .quiet-app .record-extras { margin-top: 16px; font-size: 12px; color: var(--muted); }
+.quiet-app .source-path, .quiet-app .patient-overview .help { display: none; }
+.quiet-app .time-popover { position: absolute; z-index: 45; right: 18px; top: calc(var(--bar-height) + 8px); width: min(420px, calc(100vw - 36px)); padding: 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px #302b391c; }
+.quiet-app .time-popover .timeline { min-height: 0; max-height: none; padding: 0; background: none; border: 0; }
+.time-panel-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.time-panel-heading h2 { margin: 0; font-size: 18px; }
+.time-panel-heading button { min-width: 34px; min-height: 34px; }
+.quiet-time-range { width: 100%; accent-color: var(--purple); margin: 20px 0 10px; }
+.time-state { font-size: 13px; color: var(--ink); margin-bottom: 8px; }
+.time-basis { font-size: 12px; margin-bottom: 14px; }
+.undated-toggle { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.quiet-app .table-view { position: absolute; inset: 50px 0 0; }
+.quiet-app .search-popover { width: 100%; min-width: 320px; top: calc(100% + 8px); max-height: calc(100dvh - var(--bar-height) - 24px); }
+.quiet-app .search-heading h2 { font-size: 16px; }
+@media (max-width: 700px) {
+  .quiet-app { --bar-height: 106px; }
+  .quiet-bar { display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 6px 10px; padding: 8px 12px; }
+  .quiet-bar .brand { font-size: 13px; }
+  .quiet-bar .brand svg { width: 18px; height: 18px; }
+  .quiet-bar h1 { font-size: 12px; margin: 0; }
+  .quiet-bar .search-anchor { grid-column: 1/-1; grid-row: 2; max-width: none; min-width: 0; width: 100%; }
+  .quiet-bar .focus-search input { font-size: 16px; }
+  .quiet-bar > button { padding: 6px 5px; font-size: 12px; min-height: 34px; }
+  .more-control > summary { padding: 7px 4px; font-size: 12px; }
+  .more-panel { max-height: calc(100dvh - 62px); }
+  .quiet-app .reader-open .focus-rail { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; height: min(62dvh, 570px); max-height: none; padding-bottom: env(safe-area-inset-bottom); }
+  .quiet-app .focus-breadcrumb { left: 8px; top: 5px; max-width: calc(100% - 16px); }
+  .quiet-app .focus-breadcrumb button { font-size: 11px; }
+  .quiet-app .lens-zoom { bottom: 12px; left: 10px; }
+  .quiet-app .lens-coverage { bottom: 12px; right: 10px; }
+  .quiet-app .lens-coverage-summary > button { font-size: 11px; padding: 7px 8px; }
+  .quiet-app .lens-coverage-content { width: calc(100vw - 20px); max-height: 60dvh; }
+  .quiet-app .lens-date-context { top: 41px; left: 16px; font-size: 11px; }
+  .quiet-app .search-popover { min-width: 0; max-width: none; max-height: calc(100dvh - 125px); }
+}

@@ -24,17 +24,18 @@ import "./style.css";
 import { FALLBACK_FONT_FAMILY, loadLensTypeface } from "./typography.ts";
 import {RecordInsights} from '../features/RecordInsights';
 import {unitDisplay} from '../features/clinical';
-import {emptyTaskQuery,filterTaskNodes,queryDescription,type TaskQuery} from '../features/query';
+import {emptyTaskQuery,filterTaskNodes,type TaskQuery} from '../features/query';
 import {TaskFilters} from '../features/TaskFilters';
 import {Places} from '../session/Places';
 import {viewFromURL,writeViewURL,type ViewState} from '../session/state';
 import './workspace-upgrades.css';
+import './quiet.css';
 
 const Experiments=lazy(()=>import('../experiments/Experiments'));
 
 const ALL: Scope = { cutoff: null, undated: true, group: null };
-type Mode = "2d" | "table" | "dual" | "regroup" | "lab";
-const readMode=():Mode=>{const m=new URLSearchParams(location.search).get('lens');return ['table','dual','regroup','lab'].includes(m||'')?m as Mode:'2d';};
+type Mode = "2d" | "table" | "regroup";
+const readMode=():Mode=>{const m=new URLSearchParams(location.search).get('lens');return m==='table'||m==='regroup'?m:'2d';};
 function Icon({
   type,
 }: {
@@ -118,18 +119,17 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
   const initial=useMemo(()=>viewFromURL(location.href,lm),[lm]);
   const [mode, setMode] = useState<Mode>(readMode);
   const [selected, setSelected] = useState(initial?.selected||lm.root),
-    [history, setHistory] = useState<string[]>([]),
-    [pinned, setPinned] = useState<string | null>(initial?.pinned||null);
+    [history, setHistory] = useState<string[]>([]);
+  const pinned=null, baselineDay=null, baseline=null;
   const [centerKey, setCenterKey] = useState(0);
   const [readerOpen, setReaderOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
   const [navigationId, setNavigationId] = useState(initial?.focus||initial?.selected||lm.root);
   const [cameraTarget,setCameraTarget]=useState(initial?.focus||initial?.selected||lm.root);
   const [scope, setScope] = useState<Scope>(initial?.scope||ALL),
-    [baselineDay, setBaselineDay] = useState<string | null>(initial?.baseline||null),
     [query, setQuery] = useState(""),
     [sourceId, setSourceId] = useState<string | null>(null);
-  const [railTab, setRailTab] = useState<"contents" | "links" | "compare">(
+  const [railTab, setRailTab] = useState<"contents" | "links">(
     "contents",
   );
   const [textScale,setTextScale]=useState(initial?.textScale||1);
@@ -137,19 +137,16 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
   const [showRelations,setShowRelations]=useState(false);
   const [task,setTask]=useState<TaskQuery>(emptyTaskQuery);
   const [searchOpen,setSearchOpen]=useState(false);
+  const [advancedOpen,setAdvancedOpen]=useState(false);
   const embedded=new URLSearchParams(location.search).get('embed')==='1';
   const search = useRef<HTMLInputElement>(null),
     rail = useRef<HTMLElement>(null);
-  const node = lm.nodes.get(selected)!,
-    baseline = baselineDay ? { ...scope, cutoff: baselineDay } : null;
+  const displayId=mode==='2d'?navigationId:selected;
+  const node = lm.nodes.get(displayId)!;
+  const sourceOwner=useRef(displayId);
+  const currentSource=sourceOwner.current===displayId?sourceId:null;
+  useEffect(()=>{setRailTab('contents');setAdvancedOpen(false);if(sourceOwner.current!==displayId)setSourceId(null);},[displayId]);
   const study = lm.eventFor(node);
-  const nearby =
-    study && !node.children.length
-      ? lm.m
-          .resultsFor(study.object_id)
-          .map((o) => lm.nodes.get(o.object_id)!)
-          .filter((n) => n.id !== selected && lm.eligible(n.id, scope))
-      : [];
   const choose = (id: string) => {
     setCenterKey((k) => k + 1);
     if (id !== selected) setHistory((h) => [...h.slice(-29), selected]);
@@ -189,36 +186,26 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
         setQuery("");
         setSearchOpen(false);
         setReaderOpen(false);
-        search.current?.focus({preventScroll:true});
+        setTimeOpen(false);
+        document.querySelectorAll('details[open].more-control').forEach(el=>el.removeAttribute('open'));
       }
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
-  const selectedInB=lm.eligible(selected,scope);
-  const selectedOnlyA=Boolean(mode==='table'&&baseline&&!selectedInB&&lm.eligible(selected,baseline));
-  const selectedEligible = selectedInB || selectedOnlyA,
+  const selectedEligible = lm.eligible(displayId,scope),
     visibleChildren = node.children.filter((id) => lm.contextual(id, scope));
   const searchResults=useMemo(()=>filterTaskNodes(lm,ALL,{...task,text:query}),[lm,task,query]);
-  const visibleResults = lm.m.results.filter((o) =>
-    lm.eligible(o.object_id, scope),
-  );
+  const hasSearch=Boolean(query.trim()||task.domain||task.from||task.to||task.basis!=='all'||task.kinds.length);
   const unknown = lm.m.results.filter(
     (o) => lm.times.get(o.object_id)!.basis === "unknown" && (!scope.group || lm.groupFor(o.object_id)===scope.group),
   ).length;
-  const studyGrouped = visibleResults.filter(
-    (o) => lm.times.get(o.object_id)!.basis === "study",
-  ).length;
-  const issueGrouped = visibleResults.filter(o => lm.times.get(o.object_id)!.basis === "issued").length;
   const timeControls = (
     <Timeline
       lm={lm}
       scope={scope}
-      baseline={baselineDay}
       onChange={(cutoff) => setScope((s) => ({ ...s, cutoff }))}
-      onBaseline={setBaselineDay}
-      onClose={timeOpen ? () => setTimeOpen(false) : undefined}
-      compact={!timeOpen}
+      onClose={() => setTimeOpen(false)}
     />
   );
   useEffect(() => {
@@ -231,17 +218,17 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
     if(mode==='2d'||mode==='table') window.history.replaceState(null,'',writeViewURL(location.href,{version:1,graph:data.graph_hash,selected,focus:navigationId,pinned,scope,baseline:baselineDay,mode,textScale,normalized}));
   }, [mode,selected,navigationId,pinned,scope,baselineDay,textScale,normalized,data.graph_hash]);
   const view:ViewState={version:1,graph:data.graph_hash,selected,focus:navigationId,pinned,scope,baseline:baselineDay,mode:mode==='table'?'table':'2d',textScale,normalized};
-  function restore(v:ViewState){setSelected(v.selected);setNavigationId(v.focus);setCameraTarget(v.focus);setPinned(v.pinned);setScope(v.scope);setBaselineDay(v.baseline);setMode(v.mode);setTextScale(v.textScale);setNormalized(v.normalized);setCenterKey(k=>k+1);setSourceId(null);setSearchOpen(false);}
+  function restore(v:ViewState){setSelected(v.selected);setNavigationId(v.focus);setCameraTarget(v.focus);setScope(v.scope);setMode(v.mode);setTextScale(v.textScale);setNormalized(v.normalized);setCenterKey(k=>k+1);setSourceId(null);setSearchOpen(false);}
   useEffect(()=>{const pop=()=>{const v=viewFromURL(location.href,lm);if(v)restore(v);setMode(readMode());};addEventListener('popstate',pop);return()=>removeEventListener('popstate',pop);},[lm]);
-  const openRecord=(id:string)=>{choose(id);setReaderOpen(true);requestAnimationFrame(()=>rail.current?.focus({preventScroll:true}));};
-  const openSource=(id:string)=>{openRecord(id);const o=lm.nodes.get(id)?.object;setSourceId(o?lm.m.sourceFor(o)[0]?.id||null:null);};
-  if(mode==='lab'||mode==='dual'||mode==='regroup')return <div className={`experiment-app ${embedded?'embedded':''}`} style={{'--lens-font':fontFamily} as CSSProperties}>
+  const openRecord=(id:string)=>{if(!lm.contextual(id,scope))setScope(ALL);choose(id);setReaderOpen(true);requestAnimationFrame(()=>rail.current?.focus({preventScroll:true}));};
+  const openSource=(id:string)=>{openRecord(id);sourceOwner.current=id;const o=lm.nodes.get(id)?.object;setSourceId(o?lm.m.sourceFor(o)[0]?.id||null:null);};
+  if(mode==='regroup')return <div className={`experiment-app ${embedded?'embedded':''}`} style={{'--lens-font':fontFamily} as CSSProperties}>
     <Suspense fallback={<p role="status">Відкриваємо експеримент…</p>}><Experiments lm={lm} scope={scope} fontFamily={fontFamily} initialVariant={mode} onExit={()=>swapMode('2d')}/></Suspense>
   </div>;
   return (
-    <div className={`focus-app ${embedded?'embedded':''} ${timeOpen?'time-is-open':''}`} data-typeface={fontFamily} style={{"--lens-font":fontFamily} as CSSProperties}>
+    <div className={`focus-app quiet-app ${embedded?'embedded':''}`} data-typeface={fontFamily} style={{"--lens-font":fontFamily} as CSSProperties}>
       <a className="skip-link" href="#graph-workspace">До карти й результатів</a>
-      <header className="focus-header">
+      <header className="quiet-bar">
         <button
           className="brand"
           onClick={() => choose(lm.root)}
@@ -250,34 +237,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
           <Icon type="graph" />
           <strong>MedLens</strong>
         </button>
-        <h1>
-          Карта пацієнта <span>{data.case_id}</span>
-        </h1>
-        <span className="prototype-tag">
-          HematoBoard · експериментальний перегляд
-        </span>
-        {!embedded&&<button className="lab-entry" onClick={()=>swapMode('lab')}>Лабораторія варіантів</button>}
-      </header>
-      <section className="focus-toolbar">
-        <nav aria-label="Спосіб перегляду">
-          {(
-            [
-              ["2d", "Лінза 2D"],
-              ["table", "Граф + таблиця"],
-            ] as const
-          ).map(([id, text]) => (
-            <button
-              key={id}
-              className={mode === id ? "active" : ""}
-              aria-pressed={mode === id}
-              aria-label={text}
-              onClick={() => swapMode(id)}
-            >
-              {text}
-              {id === "table" && <small>тест</small>}
-            </button>
-          ))}
-        </nav>
+        <h1><span className="sr-only">Карта пацієнта </span>{data.case_id}</h1>
         <div className="search-anchor"><label className="focus-search">
           <Icon type="search" />
           <input
@@ -291,7 +251,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               setQuery(e.target.value);
               setSearchOpen(true);
             }}
-            placeholder="Показник, дослідження або фрагмент джерела"
+            placeholder="Знайти у досьє"
             aria-label="Пошук у всьому досьє"
           />
           <kbd>⌘ K</kbd>
@@ -299,10 +259,9 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
         {searchOpen&&<section className="search-popover" aria-label="Пошук і прозорий відбір">
           <div className="search-heading"><h2>Знайти у досьє</h2><button aria-label="Закрити пошук" onClick={()=>setSearchOpen(false)}>×</button></div>
           <TaskFilters lm={lm} query={{...task,text:query}} onChange={next=>{setTask(next);setQuery(next.text);}} count={searchResults.length}/>
-          <p className="search-count" role="status" aria-live="polite">{searchResults.length} записів · {queryDescription({...task,text:query})}</p>
-          <p className="help">Пошук у всьому пакеті. Поточний часовий відбір не приховує знайдені записи; вони позначені окремо.</p>
-          <div className="search-results-list">{searchResults.map(n=><NodeRow key={n.id} n={n} lm={lm} scope={scope} onSelect={openRecord}/>)}</div>
-          {!searchResults.length&&<p>Нічого не знайдено. Скоротіть запит або скиньте умови.</p>}
+          <p className="search-count" role="status" aria-live="polite">{hasSearch?`${searchResults.length} записів у досьє`:'Введіть назву або виберіть умови.'}</p>
+          {hasSearch&&<div className="search-results-list">{searchResults.map(n=><NodeRow key={n.id} n={n} lm={lm} scope={scope} onSelect={openRecord}/>)}</div>}
+          {hasSearch&&!searchResults.length&&<p>Нічого не знайдено. Спробуйте коротшу назву.</p>}
         </section>}
         </div>
         <button
@@ -311,72 +270,30 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
           aria-expanded={timeOpen}
           onClick={() => setTimeOpen((open) => !open)}
         >
-          {scope.cutoff ? `Час: до ${date(scope.cutoff)}` : "Час: усі дати"}
+          {scope.cutoff ? `До ${date(scope.cutoff)}` : "Час"}
         </button>
         <button
           className="reader-toggle"
           aria-expanded={readerOpen}
           onClick={() => {
-            if (!readerOpen) choose(navigationId);
             setReaderOpen((open) => !open);
           }}
         >
-          {readerOpen ? "Згорнути дані" : "Дані фокуса"}
+          {readerOpen ? "Закрити дані" : "Дані"}
         </button>
-      </section>
-      <div className="focus-filters">
-        <div className="domain-filters">
-          <button
-            aria-pressed={!scope.group}
-            onClick={() => setScope((s) => ({ ...s, group: null }))}
-          >
-            Усе досьє
-          </button>
-          {lm.groups.map((id) => {
-            const n = lm.nodes.get(id)!;
-            return (
-              <button
-                key={id}
-                aria-pressed={scope.group === id}
-                onClick={() => {
-                  setScope((s) => ({
-                    ...s,
-                    group: s.group === id ? null : id,
-                  }));
-                  choose(id);
-                }}
-              >
-                <i style={{ background: n.color }} />
-                {n.title}
-              </button>
-            );
-          })}
-        </div>
-        <label>
-          <input
-            type="checkbox"
-            checked={scope.undated}
-            onChange={(e) =>
-              setScope((s) => ({ ...s, undated: e.target.checked }))
-            }
-          />
-          Без дати <small>{unknown}</small>
-        </label>
-        <span className="coverage" role="status" aria-live="polite">
-          {scope.group==="group:temporal" ? `${lm.m.temporal.filter(o=>lm.eligible(o.object_id,scope)).length} / ${lm.m.temporal.length} порівнянь` : `${visibleResults.length} / ${lm.m.results.length} результатів`}
-        </span>
-        <div className="workspace-tools">
+        <details className="more-control"><summary aria-label="Інструменти та вигляд">Ще</summary><div className="more-panel">
+          <nav aria-label="Спосіб перегляду"><button aria-pressed={mode==='2d'} onClick={()=>swapMode('2d')}>Лінза</button><button aria-pressed={mode==='table'} onClick={()=>swapMode('table')}>Таблиця</button></nav>
+          <label>Розділ<select aria-label="Розділ досьє" value={scope.group||''} onChange={e=>{const group=e.target.value||null;setScope(s=>({...s,group}));choose(group||lm.root);}}><option value="">Усе досьє</option>{lm.groups.map(id=><option key={id} value={id}>{lm.nodes.get(id)!.title}</option>)}</select></label>
+          <label>Розмір тексту<select aria-label="Масштаб тексту" value={textScale} onChange={e=>setTextScale(Number(e.target.value))}><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option></select></label>
+          <label><input type="checkbox" checked={normalized} onChange={e=>setNormalized(e.target.checked)}/>Унормовані одиниці</label>
+          <label><input type="checkbox" checked={showRelations} onChange={e=>setShowRelations(e.target.checked)}/>Структурні зв’язки</label>
+          <button className="more-action" onClick={e=>{setSourceId(null);setRailTab('links');setReaderOpen(true);e.currentTarget.closest('details')?.removeAttribute('open');}}>Зв’язки запису</button>
+          <button className="more-action" onClick={e=>{setSourceId(null);setRailTab('contents');setAdvancedOpen(true);setReaderOpen(true);e.currentTarget.closest('details')?.removeAttribute('open');}}>Технічні дані запису</button>
           <Places lm={lm} current={view} onRestore={restore} history={history} onSelect={openRecord}/>
-          <details className="reading-control"><summary>Вигляд</summary><div className="reading-panel">
-            <label>Розмір тексту<select aria-label="Масштаб тексту" value={textScale} onChange={e=>setTextScale(Number(e.target.value))}><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option></select></label>
-            <label><input type="checkbox" checked={normalized} onChange={e=>setNormalized(e.target.checked)}/>Унормований запис одиниць</label>
-            <p>Лише наявна відповідність у пакеті, без перерахунку значень. Оригінал доступний у джерелі.</p>
-            <label><input type="checkbox" checked={showRelations} onChange={e=>setShowRelations(e.target.checked)}/>Структурні зв’язки відкритого вузла</label>
-            <label><input type="checkbox" disabled/>Гіпотези — не підключені до цього пакета</label>
-          </div></details>
-        </div>
-      </div>
-      {timeOpen && timeControls}
+          <p className="demo-note">Знеособлене демо · не для клінічних рішень.</p>
+        </div></details>
+      </header>
+      {timeOpen && <div className="time-popover">{timeControls}<label className="undated-toggle"><input type="checkbox" checked={scope.undated} onChange={e=>setScope(s=>({...s,undated:e.target.checked}))}/>Записи без дати ({unknown})</label></div>}
       <main
         id="graph-workspace"
         className={`focus-workspace ${readerOpen ? "reader-open" : "reader-closed"}`}
@@ -428,7 +345,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               textScale={textScale}
               canonicalUnits={normalized}
               showRelations={showRelations||railTab==='links'}
-              sourceTrace={Boolean(sourceId)}
+              sourceTrace={Boolean(currentSource)}
               onReadSource={openSource}
               onSelect={openRecord}
               onNavigate={choose}
@@ -436,77 +353,22 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               onRead={openRecord}
             />
           )}
-          <div className="graph-foot">
-            <span>
-              {mode === "table"
-                ? "Групування й атрибути мають спільний вибір"
-                : "Перетягуйте лінзу: дані розкриваються в центрі. Натискання відкриває запис."}
-            </span>
-            <button
-              onClick={() => {
-                choose(mode === "table" ? selected : navigationId);
-                setRailTab("links");
-                setReaderOpen(true);
-                requestAnimationFrame(() =>
-                  rail.current?.scrollIntoView({ block: "nearest" }),
-                );
-              }}
-            >
-              Усі зв’язки фокуса
-            </button>
-          </div>
         </section>
         <aside
           className="focus-rail"
           ref={rail}
           tabIndex={-1}
           aria-label="Вибраний об’єкт і повні дані"
+          data-reader-object={displayId}
         >
-          <div className="mobile-reader-bar"><span>Відкрито: {node.title}</span><button aria-label="Закрити запис" onClick={()=>setReaderOpen(false)}>×</button></div>
-          {readerOpen && navigationId !== selected && (
-            <div className="reader-context-switch">
-              <span><b>Відкрито:</b> {node.title}<br/><b>У лінзі:</b> {lm.nodes.get(navigationId)?.title}</span>
-              <button onClick={() => openRecord(navigationId)}>Читати центр</button>
-              <button onClick={() => {setNavigationId(selected);setCameraTarget(selected);setCenterKey(k=>k+1);}}>До відкритого</button>
-            </div>
-          )}
-          {pinned && (
-            <div className="pinned">
-              <Icon type="pin" />
-              <button onClick={() => choose(pinned)}>
-                {lm.nodes.get(pinned)!.title}
-              </button>
-              <button
-                aria-label="Відкріпити об’єкт"
-                onClick={() => setPinned(null)}
-              >
-                ×
-              </button>
-            </div>
-          )}
           <div className="rail-header">
             <div>
               <h2>
                 <NodeGlyph kind={node.kind} color={node.color} />
                 {node.kind === "finding" ? "Опис знахідки" : node.title}
               </h2>
-              {node.kind !== "finding" && (
-                <span className="object-kind">{nodeKinds[node.kind]}</span>
-              )}
             </div>
-            <button
-              className={
-                pinned === selected ? "pin-button active" : "pin-button"
-              }
-              onClick={() => setPinned(pinned === selected ? null : selected)}
-              aria-label={
-                pinned === selected
-                  ? "Відкріпити об’єкт"
-                  : "Закріпити об’єкт для порівняння"
-              }
-            >
-              <Icon type="pin" />
-            </button>
+            <button className="close-reader" aria-label="Закрити запис" onClick={()=>setReaderOpen(false)}>×</button>
           </div>
           {study && node.kind !== "clinical_event" && (
             <button
@@ -522,47 +384,17 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               <b>↑</b>
             </button>
           )}
-          <nav className="rail-tabs" aria-label="Вміст фокуса">
-            <button
-              aria-pressed={railTab === "contents"}
-              onClick={() => {
-                setRailTab("contents");
-                setSourceId(null);
-              }}
-            >
-              Дані
-            </button>
-            <button
-              aria-pressed={railTab === "links"}
-              onClick={() => {
-                setRailTab("links");
-                setSourceId(null);
-              }}
-            >
-              Зв’язки
-            </button>
-            <button
-              aria-pressed={railTab === "compare"}
-              onClick={() => {
-                setRailTab("compare");
-                setSourceId(null);
-              }}
-            >
-              Зіставлення
-            </button>
-          </nav>
-          <div className="rail-content">
-            {selectedOnlyA&&<p className="comparison-reader-note" role="status">Запис тільки у A · {date(baselineDay)}. Дані та джерело відкриті для зіставлення; відбір B не змінено.</p>}
-            {sourceId && selectedEligible ? (
+          <div className="rail-content" key={displayId}>
+            {railTab==='links'&&<button className="back-text" onClick={()=>setRailTab('contents')}>До даних</button>}
+            {currentSource && selectedEligible ? (
               <>
                 <button className="back-text" onClick={() => setSourceId(null)}>
                   <Icon type="back" />
                   До об’єкта
                 </button>
                 <h3>Точний текст джерела</h3>
-                <nav className="source-path" aria-label="Шлях до джерела">{lm.ancestors(selected).filter(n=>n.object).map(n=><button key={n.id} onClick={()=>openRecord(n.id)}>{n.title}</button>)}</nav>
                 {data.sources
-                  .filter((s) => s.id === sourceId)
+                  .filter((s) => s.id === currentSource)
                   .map((s) => (
                     <div key={s.id} className="source-text">
                       <p>
@@ -580,22 +412,13 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               </>
             ) : railTab === "links" && selectedEligible ? (
               <Links node={node} lm={lm} onSelect={choose} />
-            ) : railTab === "compare" ? (
-              <Comparison
-                node={node}
-                pinned={pinned ? lm.nodes.get(pinned)! : null}
-                lm={lm}
-                scope={scope}
-                baseline={baseline}
-                onSelect={choose}
-              />
             ) : (
               <>
                 {!selectedEligible && node.object && (
                   <div className="outside">
                     <strong>Запис поза обраним відбором</strong>
                     <p>
-                      {lm.times.get(selected)?.text}. Значення й джерела
+                      {lm.times.get(displayId)?.text}. Значення й джерела
                       приховані цим відбором.
                     </p>
                     <button onClick={() => setScope(ALL)}>
@@ -608,11 +431,12 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                     n={node}
                     lm={lm}
                     normalized={normalized}
-                    onSource={setSourceId}
+                    showTechnical={advancedOpen}
+                    onSource={id=>{sourceOwner.current=displayId;setSourceId(id);}}
                     onSelect={choose}
                   />
                 )}
-                {node.object&&selectedEligible&&<RecordInsights lm={lm} node={node} scope={selectedOnlyA?baseline!:scope} normalized={normalized} onSelect={openRecord}/>}
+                {advancedOpen&&node.object&&selectedEligible&&<RecordInsights lm={lm} node={node} scope={scope} normalized={normalized} onSelect={openRecord}/>}
                 {node.kind === "group" && (
                   <p className="help">
                     {preview(lm, node, scope).content}. Вибір нижче пересуває цю
@@ -634,10 +458,6 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                     <p>
                       {lm.m.events.length} досліджень · {lm.m.results.length}{" "}
                       результатів · {lm.m.specimens.length} матеріалів
-                    </p>
-                    <p className="help">
-                      Оберіть гілку на карті або в списку. Змінюйте дату внизу —
-                      фокус і таблиця залишаться синхронними.
                     </p>
                   </div>
                 )}
@@ -668,41 +488,11 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                     поза відбором.
                   </p>
                 )}
-                {nearby.length > 0 && (
-                  <details className="nearby-results">
-                    <summary>
-                      Інші результати цього дослідження · {nearby.length}
-                    </summary>
-                    {nearby.map((n) => (
-                      <NodeRow
-                        key={n.id}
-                        n={n}
-                        lm={lm}
-                        scope={scope}
-                        onSelect={choose}
-                      />
-                    ))}
-                  </details>
-                )}
               </>
             )}
           </div>
         </aside>
       </main>
-      {!timeOpen && timeControls}
-      <div className="focus-footer">
-        <span>
-          {data.objects.length} об’єктів · {data.edges.length} структурних
-          зв’язків · {data.graph_hash.slice(0, 8)}
-        </span>
-        <span>
-          {studyGrouped
-            ? `${studyGrouped} результатів згруповано за датою дослідження; власна дата відсутня. `
-            : ""}
-          {issueGrouped ? `${issueGrouped} результатів — за датою видачі. ` : ""}
-          Публічний знімок · без гіпотез · не для клінічних рішень.
-        </span>
-      </div>
     </div>
   );
 }
@@ -723,6 +513,7 @@ function NodeRow({
       className={`node-row ${eligible ? "" : "out-of-scope"}`}
       onClick={() => onSelect(n.id)}
       data-select-object={n.id}
+      title={eligible?undefined:'Відкрити в усьому досьє'}
     >
       <NodeGlyph kind={n.kind} color={n.color} />
       <span>
@@ -745,12 +536,14 @@ function ObjectDetail({
   onSource,
   onSelect,
   normalized=false,
+  showTechnical=false,
 }: {
   n: LensNode;
   lm: LensModel;
   onSource: (id: string) => void;
   onSelect: (id: string) => void;
   normalized?: boolean;
+  showTechnical?: boolean;
 }) {
   const o = n.object!,
     t = lm.times.get(n.id)!,
@@ -793,9 +586,7 @@ function ObjectDetail({
         <dl>
           <dt>Дата</dt>
           <dd>
-            {t.text}
-            {t.basis === "study" && <small>Власної дати запису немає.</small>}
-            {t.basis === "issued" && <small>Клінічна дата не визначена. Для відбору використано дату видачі дослідження.</small>}
+            {t.basis==='issued'?`${date(t.day)} · видано`:t.text}
           </dd>
           {n.kind === "observation" && (
             <>
@@ -821,14 +612,14 @@ function ObjectDetail({
           )}
         </dl>
       )}
-      {n.kind === "clinical_event" && o.payload.times?.length > 0 && (
-        <div className="event-times">
+      {showTechnical && n.kind === "clinical_event" && o.payload.times?.length > 0 && (
+        <details className="event-times"><summary>Дати документа</summary>
           {o.payload.times.map((v: any, i: number) => (
             <span key={i}>
               {timeRoles[v.kind] || v.kind}: {date(v.date)}
             </span>
           ))}
-        </div>
+        </details>
       )}
       {lm.m.sourceFor(o).length > 0 && (
         <div className="source-links">
@@ -836,17 +627,16 @@ function ObjectDetail({
             <button key={s.id} onClick={() => onSource(s.id)}>
               <Icon type="source" />
               <span>
-                Сторінка {s.derived_pdf_page ?? "не зазначена"} · запис{" "}
-                {s.source_order}
+                Джерело · стор. {s.derived_pdf_page ?? "—"}
               </span>
               <b>›</b>
             </button>
           ))}
         </div>
       )}
-      {n.kind !== "patient" && (
+      {showTechnical && n.kind !== "patient" && (
         <details>
-          <summary>Повні поля запису</summary>
+          <summary>Технічні поля</summary>
           <code>
             {o.object_id}
             <br />
@@ -905,67 +695,6 @@ function Links({
           </button>
         );
       })}
-    </>
-  );
-}
-function Comparison({
-  node,
-  pinned,
-  lm,
-  scope,
-  baseline,
-  onSelect,
-}: {
-  node: LensNode;
-  pinned: LensNode | null;
-  lm: LensModel;
-  scope: Scope;
-  baseline: Scope | null;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <>
-      <h3>Зіставлення фокусів</h3>
-      {pinned && pinned.id !== node.id ? (
-        <div className="compare-pair">
-          {[pinned, node].map((n, i) => (
-            <section key={n.id}>
-              <small>{i ? "Поточний фокус" : "Закріплений фокус"}</small>
-              <h4>{n.title}</h4>
-              <p>
-                {lm.eligible(n.id, scope) ? lm.summary(n) : "Поза відбором"}
-              </p>
-              <p>{lm.times.get(n.id)?.text}</p>
-              <button onClick={() => onSelect(n.id)}>У фокус</button>
-            </section>
-          ))}
-        </div>
-      ) : (
-        <p className="help">
-          Закріпіть один об’єкт кнопкою поруч із заголовком, потім виберіть
-          інший.
-        </p>
-      )}
-      <h3>Два часові відбори</h3>
-      {baseline ? (
-        <>
-          <p>
-            A: {date(baseline.cutoff)}
-            <br />
-            B: {scope.cutoff ? date(scope.cutoff) : "усі дати"}
-          </p>
-          <p className="help">
-            У режимі «Граф + таблиця» видно належність кожного об’єкта до A та
-            B. Порівнюється склад записів поточної ревізії, не реконструйований
-            фізіологічний стан.
-          </p>
-        </>
-      ) : (
-        <p className="help">
-          Відкрийте «Час», виберіть дату й натисніть «Зафіксувати цю дату як A».
-          Потім виберіть дату B. Таблиця покаже записи обох відборів.
-        </p>
-      )}
     </>
   );
 }

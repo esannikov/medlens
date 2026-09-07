@@ -380,11 +380,10 @@ assert(
   ).includes("<line "),
   "Leader lines must not return",
 );
-assert.match(
-  readFileSync(new URL("./src/focus/main.tsx", import.meta.url), "utf8"),
-  /choose\(\s*mode === "table" \? selected : navigationId\s*\);\s*setRailTab\("links"\)/,
-  "Focus-links action must choose the navigation focus before opening links",
-);
+const appSource = readFileSync(new URL("./src/focus/main.tsx", import.meta.url), "utf8");
+assert.match(appSource, /const displayId=mode==='2d'\?navigationId:selected/, "Reader and links follow the actual lens focus without recentering it");
+assert.match(appSource, /const node = lm.nodes.get\(displayId\)!/, "The focused node owns the reader content");
+assert.match(appSource, /sourceOwner.current===displayId\?sourceId:null/, "An old record source must not leak into a new focus");
 for (const n of lm.order.filter(
   (n) => n.kind === "clinical_event" || n.kind === "specimen",
 ))
