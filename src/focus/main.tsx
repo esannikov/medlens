@@ -17,6 +17,7 @@ import {
 } from "./model.ts";
 import { Lens } from "./Lens";
 import { Breadcrumbs } from './Breadcrumbs';
+import {ResultContents,SourceDisclosure} from './ReaderContent';
 import { NodeGlyph } from "./NodeGlyph";
 import { nodeKinds, preview } from "./layout.ts";
 import { TreeTable } from "./TreeTable";
@@ -410,7 +411,6 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                     lm={lm}
                     normalized={normalized}
                     showTechnical={advancedOpen}
-                    onSource={id=>{sourceOwner.current=displayId;setSourceId(id);}}
                     onSelect={choose}
                   />
                 )}
@@ -439,7 +439,9 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                     </p>
                   </div>
                 )}
-                {visibleChildren.length > 0 && (
+                {selectedEligible&&(node.kind==='clinical_event'||node.kind==='specimen') ? (
+                  <ResultContents lm={lm} node={node} scope={scope} normalized={normalized} onSelect={choose}/>
+                ) : visibleChildren.length > 0 && (
                   <>
                     <h3>
                       {node.kind === "specimen"
@@ -460,12 +462,13 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                     ))}
                   </>
                 )}
-                {node.children.length > visibleChildren.length && (
+                {!['clinical_event','specimen'].includes(node.kind)&&node.children.length > visibleChildren.length && (
                   <p className="help">
                     Ще {node.children.length - visibleChildren.length} елементів
                     поза відбором.
                   </p>
                 )}
+                {selectedEligible&&<SourceDisclosure lm={lm} node={node} scope={scope} onSource={id=>{sourceOwner.current=displayId;setSourceId(id);}}/>}
               </>
             )}
           </div>
@@ -511,14 +514,12 @@ function NodeRow({
 function ObjectDetail({
   n,
   lm,
-  onSource,
   onSelect,
   normalized=false,
   showTechnical=false,
 }: {
   n: LensNode;
   lm: LensModel;
-  onSource: (id: string) => void;
   onSelect: (id: string) => void;
   normalized?: boolean;
   showTechnical?: boolean;
@@ -556,7 +557,7 @@ function ObjectDetail({
       {n.kind === "observation" && (
         <div className="result-value">
           {value(o)}
-          <span>{unitDisplay(o,normalized) || "одиницю не зазначено"}</span>
+          <span>{o.payload.source_unit?.trim()?unitDisplay(o,normalized):"одиницю не зазначено"}</span>
         </div>
       )}
       {n.kind === "finding" && <p className="finding-full">{n.title}</p>}
@@ -598,19 +599,6 @@ function ObjectDetail({
             </span>
           ))}
         </details>
-      )}
-      {lm.m.sourceFor(o).length > 0 && (
-        <div className="source-links">
-          {lm.m.sourceFor(o).map((s) => (
-            <button key={s.id} onClick={() => onSource(s.id)}>
-              <Icon type="source" />
-              <span>
-                Джерело · стор. {s.derived_pdf_page ?? "—"}
-              </span>
-              <b>›</b>
-            </button>
-          ))}
-        </div>
       )}
       {showTechnical && n.kind !== "patient" && (
         <details>

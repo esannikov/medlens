@@ -76,6 +76,19 @@ export function focusPoint(p: Vec, a: Vec): Vec {
     (v, i) => ((1 - a2) * v - (1 - 2 * dot + p2) * a[i]) / denom,
   ) as Vec;
 }
+/** Solve w=(z-a)/(1-conj(a)z) for the camera a. Unlike a camera delta,
+ * this keeps the grabbed world point z at the pointer's disk position w,
+ * including when z starts at the compressed edge of the lens. */
+export function focusForAnchor(world: Vec, target: Vec): Vec {
+  const [zx, zy] = world, [wx, wy] = clampDisk(target, .995);
+  const kx = wx * zx - wy * zy, ky = wx * zy + wy * zx;
+  const bx = zx - wx, by = zy - wy;
+  const denominator = Math.max(1e-12, 1 - kx * kx - ky * ky);
+  return clampDisk([
+    (bx + kx * bx + ky * by) / denominator,
+    (by + ky * bx - kx * by) / denominator,
+  ], 1 - 1e-9);
+}
 export const lerpVec = (a: Vec, b: Vec, t: number): Vec =>
   a.map((v, i) => v + (b[i] - v) * t) as Vec;
 

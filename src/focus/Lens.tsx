@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Keyb
 import {
   clampDisk,
   focusPoint,
+  focusForAnchor,
   geodesic,
   lerpVec,
   norm,
@@ -70,7 +71,7 @@ export function Lens({
   readerOpen?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
-    drag = useRef<{ x: number; y: number; focus: Vec; moved: boolean } | null>(
+    drag = useRef<{ x: number; y: number; world: Vec; anchor: Vec; moved: boolean } | null>(
       null,
     ),
     frame = useRef(0);
@@ -290,12 +291,23 @@ export function Lens({
           }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
+            const bounds=e.currentTarget.getBoundingClientRect();
+            const target=(e.target as Element).closest('[data-lens-node],[data-label-for]');
+            const id=target?.getAttribute('data-lens-node')||target?.getAttribute('data-label-for');
+            const node=id?lm.nodes.get(id):undefined;
+            // Labels retain their initial pointer-to-node offset. Background
+            // drags grab the actual disk location rather than its centre.
+            const anchor:Vec=node?focusPoint(node.p2,currentFocus.current):clampDisk([
+              (e.clientX-bounds.left-size.width/2)/radius,
+              -(e.clientY-bounds.top-size.height/2)/radius,
+            ],.995);
             setHovered(null);
             cancelAnimationFrame(frame.current);
             drag.current = {
               x: e.clientX,
               y: e.clientY,
-              focus: currentFocus.current,
+              world: node?.p2 || focusPoint(anchor,currentFocus.current.map(v=>-v) as Vec),
+              anchor,
               moved: false,
             };
           }}
@@ -316,13 +328,10 @@ export function Lens({
               setMoving(true);
               setHovered(null);
               e.currentTarget.setPointerCapture(e.pointerId);
-              const delta = clampDisk(
-                [-(e.clientX - d.x) / radius, (e.clientY - d.y) / radius],
-                0.85,
-              );
-              const next = clampDisk(
-                focusPoint(delta, d.focus.map((v) => -v) as Vec),
-              );
+              const next = focusForAnchor(d.world,[
+                d.anchor[0]+(e.clientX-d.x)/radius,
+                d.anchor[1]-(e.clientY-d.y)/radius,
+              ]);
               currentFocus.current = next;
               setFocus(next);
             }

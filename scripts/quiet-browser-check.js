@@ -23,7 +23,7 @@ async (page) => {
   const panTo=async(id)=>{
     const d=await page.locator(`[data-lens-node="${id}"]`).evaluate(el=>{
       const s=el.ownerSVGElement,b=s.getBoundingClientRect(),t=el.transform.baseVal.consolidate().matrix,c=s.querySelector('.lens-boundary');
-      return {x:b.x+b.width*.45,y:b.y+b.height*.52,dx:Number(c.getAttribute('cx'))-t.e,dy:Number(c.getAttribute('cy'))-t.f};
+      return {x:b.x+t.e,y:b.y+t.f,dx:Number(c.getAttribute('cx'))-t.e,dy:Number(c.getAttribute('cy'))-t.f};
     });
     await page.mouse.move(d.x,d.y);await page.mouse.down();
     await page.mouse.move(d.x+d.dx,d.y+d.dy,{steps:22});
@@ -58,7 +58,8 @@ async (page) => {
     check(await page.locator('.focus-rail .record-insights,.focus-rail .node-row,.focus-rail .rail-tabs').count()===0,'No unrelated records or technical extras by default');
     const g=await geometry();
     await page.screenshot({path:'output/playwright/quiet-check-urea.png'});
-    await page.getByRole('button',{name:'Джерело · стор. 11'}).click();
+    await page.locator('.reader-sources > summary').click();
+    await page.locator('[data-source-id="SR-0845FEA2BE58-P0028"]').click();
     check((await page.locator('.source-text').innerText()).includes('Сечовина: 4.2 ммоль/л; референс 2.1–7.1.'),'Exact Urea source');
     check(JSON.stringify(g)===JSON.stringify(await geometry()),'Source does not resize lens');
     await page.screenshot({path:'output/playwright/quiet-check-source.png'});

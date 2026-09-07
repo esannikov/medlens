@@ -4,7 +4,9 @@ async(page)=>{
  const checks=[];const check=(v,name)=>{if(!v)throw Error(name);checks.push(name);};
  const settle=()=>page.waitForTimeout(480);
  const enter=async()=>{await page.goto(base+'?at='+owner+'&revision=edfaf88447668409717873f4b0cb9c38a7603f01b94c668b76a8c0504c9b422f');await page.locator('.lens-boundary').waitFor();await settle();};
- await page.setViewportSize({width:1440,height:1000});await enter();
+ // Keep the original reading-area budget plus the new 64px navigation strip.
+ // Smaller viewports below still check all nodes and fixed panel geometry.
+ await page.setViewportSize({width:1440,height:1064});await enter();
  const resultIds=await page.locator('.lens-coverage').getAttribute('data-coverage-result-ids');
  const ids=resultIds.split(' ');check(ids.length===27,'All 27 punctate results remain present');
  check(await page.locator('[data-compass-cluster="group:laboratory_panel"]').count()===0,'Active section is absent while reading its specimen');

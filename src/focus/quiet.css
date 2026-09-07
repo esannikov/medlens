@@ -1,5 +1,5 @@
 /* The viewport is the only layout input to the lens. Panels never own a track. */
-.quiet-app { --bar-height: 64px; position: relative; height: 100dvh; min-height: 360px; overflow: hidden; }
+.quiet-app { --bar-height: 64px; --navigation-height: 64px; position: relative; height: 100dvh; min-height: 360px; overflow: hidden; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .quiet-bar { position: relative; z-index: 40; display: flex; align-items: center; gap: 14px; height: var(--bar-height); padding: 10px 20px; border-bottom: 1px solid #eee8f2; background: var(--paper); }
 .quiet-bar .brand { gap: 7px; padding: 4px 0; border: 0; background: none; }
@@ -22,7 +22,7 @@
 .demo-note { font-size: 11px; margin: 16px 0 0; }
 .quiet-app > .focus-workspace { position: absolute; top: var(--bar-height); bottom: 0; left: 0; right: 0; display: block; min-height: 0; height: auto; overflow: hidden; }
 .quiet-app .graph-workspace { position: absolute; inset: 0; height: 100%; min-height: 0; display: block; overflow: hidden; }
-.quiet-app .lens-view { position: absolute; inset: 0; display: block; margin: 0; padding: 0; }
+.quiet-app .lens-view { position: absolute; inset: var(--navigation-height) 0 0; display: block; margin: 0; padding: 0; }
 .quiet-app .lens-view .lens { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; }
 .quiet-app .lens-svg { width: 100%; height: 100%; display: block; }
 .quiet-app .focus-breadcrumb { position: absolute; top: 8px; left: 14px; right: auto; max-width: calc(100% - 28px); height: 34px; min-height: 0; padding: 0; z-index: 6; border: 0; background: transparent; gap: 8px; }
@@ -39,7 +39,7 @@
 .quiet-app .crumb-separator { color: var(--crumb-color); opacity: .5; font-size: 13px; }
 @media (min-width: 701px) { .quiet-app .reader-open .focus-breadcrumb { max-width: calc(100% - 400px); } }
 .quiet-app .reset-focus { display: none; }
-.quiet-app .lens-date-context { position: absolute; top: 45px; left: 24px; z-index: 4; font: 12px var(--lens-font); color: #665770; max-width: calc(100% - 48px); pointer-events: none; }
+.quiet-app .lens-date-context { position: absolute; top: -19px; left: 24px; z-index: 4; font: 12px var(--lens-font); color: #665770; max-width: calc(100% - 48px); pointer-events: none; }
 .quiet-app .lens-zoom { left: 18px; bottom: 18px; z-index: 7; gap: 4px; }
 .quiet-app .lens-zoom > button { background: var(--paper); min-width: 38px; min-height: 38px; padding: 6px 9px; }
 .quiet-app .lens-navigation-menu { display: none; }
@@ -52,7 +52,7 @@
 .quiet-app .focus-rail { display: none; }
 .quiet-app .reader-open .focus-rail { display: flex; position: absolute; z-index: 20; top: 8px; right: 10px; bottom: 10px; left: auto; width: 360px; height: auto; min-height: 0; max-height: none; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px #302b391c; background: var(--paper); overflow: hidden; }
 .quiet-app .rail-header { padding: 20px 18px 12px; align-items: start; gap: 12px; }
-.quiet-app .rail-header h2 { font-size: 22px; font-weight: 600; line-height: 1.3; }
+.quiet-app .rail-header h2 { font-size: 22px; font-weight: 600; line-height: 1.3; max-height: none; overflow: visible; }
 .quiet-app .close-reader { min-height: 34px; min-width: 34px; border-color: transparent; background: none; font-size: 20px; flex-shrink: 0; }
 .quiet-app .study-return { padding: 0 18px 14px; border: 0; background: transparent; }
 .quiet-app .study-return > svg, .quiet-app .study-return > b { display: none; }
@@ -62,6 +62,23 @@
 .quiet-app .rail-tabs { min-height: 36px; }
 .quiet-app .rail-tabs button { font-size: 12px; padding: 7px 12px; min-height: 36px; }
 .quiet-app .rail-content { padding: 18px; }
+.quiet-app .reader-results h3 { font-size: 13px; font-weight: 500; margin: 24px 0 8px; color: #6b5e74; display: flex; justify-content: space-between; gap: 12px; }
+.quiet-app .reader-results h3 small { font: inherit; }
+.quiet-app .reader-result { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; width: 100%; min-height: 44px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font-size: 14px; line-height: 1.5; text-align: left; }
+.quiet-app .reader-result > span { min-width: 0; overflow-wrap: anywhere; }
+.quiet-app .reader-result > strong { flex: 0 0 auto; max-width: 52%; font: 500 16px var(--lens-font); text-align: right; color: #087F71; }
+.quiet-app .reader-result strong small { font: 12px var(--lens-font); }
+.quiet-app .reader-result.finding { font-size: 15px; line-height: 1.65; padding: 16px 0; white-space: pre-wrap; }
+.quiet-app .reader-result:hover { background: var(--soft); }
+.quiet-app .reader-sources { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px; }
+.quiet-app .reader-sources > summary { cursor: pointer; color: #665770; padding: 12px 0; min-height: 44px; }
+.quiet-app .reader-sources > summary small { margin-left: 8px; font-size: 11px; }
+.quiet-app .reader-sources .source-links { margin: 0; }
+.quiet-app .reader-sources .source-links button { display: flex; gap: 12px; align-items: center; text-align: left; min-height: 44px; }
+.quiet-app .reader-sources .source-links button > span { flex: 1; min-width: 0; }
+.quiet-app .reader-sources .source-links strong, .quiet-app .source-excerpt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink); font-weight: 400; line-height: 1.5; }
+.quiet-app .source-excerpt { margin-top: 4px; }
+.quiet-app .reader-sources .source-links small { display: block; margin-top: 5px; font-size: 11px; color: #665770; }
 .quiet-app .result-value { font-size: 36px; margin: 2px 0 22px; }
 .quiet-app .result-value > span { font-size: 16px; margin-left: 7px; }
 .quiet-app .object-detail dl { font-size: 13px; line-height: 1.5; }
@@ -77,7 +94,7 @@
 .time-state { font-size: 13px; color: var(--ink); margin-bottom: 8px; }
 .time-basis { font-size: 12px; margin-bottom: 14px; }
 .undated-toggle { font-size: 13px; display: flex; align-items: center; gap: 8px; }
-.quiet-app .table-view { position: absolute; inset: 50px 0 0; }
+.quiet-app .table-view { position: absolute; inset: var(--navigation-height) 0 0; }
 .quiet-app .search-popover { width: 100%; min-width: 320px; top: calc(100% + 8px); max-height: calc(100dvh - var(--bar-height) - 24px); }
 .quiet-app .search-heading h2 { font-size: 16px; }
 .lens-orbit-compass text { paint-order: stroke fill; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
@@ -100,6 +117,7 @@
   .more-control > summary { padding: 7px 4px; font-size: 12px; }
   .more-panel { max-height: calc(100dvh - 62px); }
   .quiet-app .reader-open .focus-rail { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; height: min(62dvh, 570px); max-height: none; padding-bottom: env(safe-area-inset-bottom); }
+  .quiet-app .rail-header h2 { font-size: 18px; }
   .quiet-app .focus-breadcrumb { left: 8px; top: 5px; max-width: calc(100% - 16px); }
   .quiet-app .focus-breadcrumb button { font-size: 11px; }
   .quiet-app .breadcrumb-chips { gap: 5px; }
@@ -109,6 +127,6 @@
   .quiet-app .lens-coverage { bottom: 12px; right: 10px; }
   .quiet-app .lens-coverage-summary > button { font-size: 11px; padding: 7px 8px; }
   .quiet-app .lens-coverage-content { width: calc(100vw - 20px); max-height: 60dvh; }
-  .quiet-app .lens-date-context { top: 41px; left: 16px; font-size: 11px; }
+  .quiet-app .lens-date-context { top: -23px; left: 16px; font-size: 11px; }
   .quiet-app .search-popover { min-width: 0; max-width: none; max-height: calc(100dvh - 125px); }
 }

@@ -302,7 +302,10 @@ export function lensGeometry(
 ) {
   const centerId = focusCenter(lm, scope, focus);
   const ctx = neighborhood(lm, centerId, scope);
-  const radius = Math.min(width * 0.43, height * 0.44) * zoom;
+  // Reserve a fixed rim/compass clearance, not a growing percentage of the
+  // viewport. The separate navigation strip must not shrink the reading field
+  // a second time by keeping the former header-sized vertical margins.
+  const radius = Math.max(1,Math.min(width * 0.43, height / 2 - 36)) * zoom;
   const project = (p: Vec): Vec => [
     width / 2 + p[0] * radius,
     height / 2 - p[1] * radius,

@@ -28,7 +28,7 @@ async(page)=>{
   await page.getByRole('button',{name:'Дані',exact:true}).click();
   const delta=await page.locator(`[data-lens-node="${blood}"]`).evaluate(el=>{
    const s=el.ownerSVGElement,b=s.getBoundingClientRect(),m=el.transform.baseVal.consolidate().matrix,c=s.querySelector('.lens-boundary');
-   return {x:b.x+b.width*.45,y:b.y+b.height*.5,dx:Number(c.getAttribute('cx'))-m.e,dy:Number(c.getAttribute('cy'))-m.f};
+   return {x:b.x+m.e,y:b.y+m.f,dx:Number(c.getAttribute('cx'))-m.e,dy:Number(c.getAttribute('cy'))-m.f};
   });
   await page.mouse.move(delta.x,delta.y);await page.mouse.down();await page.mouse.move(delta.x+delta.dx,delta.y+delta.dy);
   check(await focus()===flc,'Brief crossing does not immediately change the reading focus');
@@ -42,7 +42,7 @@ async(page)=>{
   await enter(flc);
   const interrupted=await page.locator(`[data-lens-node="${blood}"]`).evaluate(el=>{
    const s=el.ownerSVGElement,b=s.getBoundingClientRect(),m=el.transform.baseVal.consolidate().matrix,c=s.querySelector('.lens-boundary');
-   return {x:b.x+b.width*.45,y:b.y+b.height*.5,dx:Number(c.getAttribute('cx'))-m.e,dy:Number(c.getAttribute('cy'))-m.f};
+   return {x:b.x+m.e,y:b.y+m.f,dx:Number(c.getAttribute('cx'))-m.e,dy:Number(c.getAttribute('cy'))-m.f};
   });
   await page.mouse.move(interrupted.x,interrupted.y);await page.mouse.down();await page.mouse.move(interrupted.x+interrupted.dx,interrupted.y+interrupted.dy);await page.mouse.up();
   await page.locator('[data-compass-cluster="group:imaging_study"]').focus();await page.keyboard.press('Enter');
