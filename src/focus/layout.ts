@@ -9,6 +9,7 @@ import {
   type Vec,
 } from "./model.ts";
 import { value } from "../model.ts";
+import { unitDisplay } from "../features/clinical.ts";
 import { LENS_FONT_FAMILY } from "./typography.ts";
 
 export const nodeKinds: Record<LensNode["kind"], string> = {
@@ -20,11 +21,11 @@ export const nodeKinds: Record<LensNode["kind"], string> = {
   finding: "Опис знахідки",
   temporal_relation: "Зміна між дослідженнями",
 };
-export function preview(lm: LensModel, n: LensNode, scope: Scope) {
+export function preview(lm: LensModel, n: LensNode, scope: Scope, canonicalUnits = false) {
   const counts = lm.count(n.id, scope);
   const content =
     n.kind === "observation"
-      ? `${value(n.object!)} ${n.object!.payload.source_unit || ""}`.trim()
+      ? `${value(n.object!)} ${unitDisplay(n.object!, canonicalUnits) === "Не зазначено" ? "· одиницю не зазначено" : unitDisplay(n.object!, canonicalUnits)}`.trim()
       : n.kind === "finding"
         ? ""
         : n.kind === "temporal_relation"
@@ -90,6 +91,69 @@ export function neighborhood(lm: LensModel, selected: string, scope: Scope) {
   const path = new Set(lm.ancestors(selected).map((n) => n.id));
   return { node, parent, items, local, path };
 }
+
+/** A coverage claim contains only source-backed result objects in this scope.
+ * Category and dossier navigation counts deliberately have no coverage claim. */
+export function activeResultCoverage(lm: LensModel, centerId: string, scope: Scope, labels: readonly Label[]) {
+  const owner = [...lm.ancestors(centerId)].reverse()
+    .find(n => n.kind === "specimen" || n.kind === "clinical_event");
+  if (!owner) return null;
+  const all = owner.descendants.filter(id => {
+    const node = lm.nodes.get(id)!;
+    return !!node.object && (node.kind === "observation" || node.kind === "finding");
+  });
+  const eligible = all.filter(id => lm.eligible(id, scope));
+  // A nearly faded caption is not counted as a readable result.
+  const readable = new Set(labels.filter(label => label.opacity >= 0.95).map(label => label.id));
+  return {
+    owner,
+    all,
+    eligible,
+    displayed: eligible.filter(id => readable.has(id)),
+    hidden: eligible.filter(id => !readable.has(id)),
+    excluded: all.filter(id => !lm.eligible(id, scope)),
+  };
+}
+
+export const structuralRelationNames: Record<string, string> = {
+  has_event: "Досьє → дослідження",
+  has_specimen: "Дослідження → матеріал",
+  has_observation: "Дослідження → показник",
+  yields_finding: "Дослідження → знахідка",
+  derived_from_specimen: "Матеріал → результат",
+};
+
+/** These are the exact supplied edges, never the lens's display/group tree. */
+export function exactStructuralEdges(lm: LensModel, selected: string, trace = false) {
+  if (!lm.nodes.get(selected)?.object) return [];
+  if (!trace) return lm.data.edges.filter(edge => edge.source === selected || edge.target === selected);
+  const visited = new Set<string>([selected]);
+  const edgeIds = new Set<string>();
+  const pending = [selected];
+  while (pending.length) {
+    const target = pending.pop()!;
+    for (const edge of lm.data.edges.filter(item => item.target === target)) {
+      edgeIds.add(edge.id);
+      if (!visited.has(edge.source)) {
+        visited.add(edge.source);
+        pending.push(edge.source);
+      }
+    }
+  }
+  return lm.data.edges.filter(edge => edgeIds.has(edge.id));
+}
+
+export function keyboardDestination(lm: LensModel, id: string, scope: Scope, direction: "parent" | "child" | "previous" | "next" | "root") {
+  const node = lm.nodes.get(id);
+  if (!node) return null;
+  if (direction === "root") return lm.root;
+  if (direction === "parent") return node.parent;
+  if (direction === "child") return node.children.find(child => lm.contextual(child, scope)) || null;
+  const siblings = (node.parent ? lm.nodes.get(node.parent)!.children : [id])
+    .filter(sibling => lm.contextual(sibling, scope));
+  const index = siblings.indexOf(id);
+  return index < 0 ? null : siblings[index + (direction === "previous" ? -1 : 1)] || null;
+}
 export type Point = {
   id: string;
   x: number;
@@ -109,6 +173,7 @@ export type Path = {
 };
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Label = Rect & {
+  detailLevel: "near" | "context";
   textAnchor: "start" | "middle" | "end";
   textX: number;
   anchor: number;
@@ -152,12 +217,13 @@ export function connectionStyle(near: number, role: "route" | "branch" | "contex
   };
 }
 const titleFont = `600 12.5px ${LENS_FONT_FAMILY}`;
-export function lensTypography(distance: number) {
+export function lensTypography(distance: number, textScale = 1) {
   const near = Math.max(0, Math.min(1, 1 - distance));
+  const scale = Math.max(0.85, Math.min(1.6, textScale));
   return {
-    titleSize: 11.5 + 9.5 * near ** 0.8,
-    detailSize: 10 + 6 * near ** 0.8,
-    metaSize: 10 + 2 * near ** 0.8,
+    titleSize: (11.5 + 9.5 * near ** 0.8) * scale,
+    detailSize: (10 + 6 * near ** 0.8) * scale,
+    metaSize: (10 + 2 * near ** 0.8) * scale,
   };
 }
 
@@ -306,57 +372,82 @@ export function placeLabels(
   previous: ReadonlyMap<string, Label> = new Map(),
   moving = false,
   family = LENS_FONT_FAMILY,
+  options: { textScale?: number; centerId?: string; canonicalUnits?: boolean } = {},
 ) {
   const labels: Label[] = [];
+  const textScale = Math.max(0.85, Math.min(1.6, options.textScale ?? 1));
+  const centerId = options.centerId || [...points].filter(p => p.active).sort((a, b) => norm(a.p) - norm(b.p))[0]?.id || selected;
+  const center = lm.nodes.get(centerId)!;
+  const branchOwner = center.children.length ? center : lm.nodes.get(center.parent || centerId)!;
+  const branch = new Set([branchOwner.id, ...branchOwner.children]);
+  const priority = (p: Point) => p.id === centerId ? 0 : branch.has(p.id) && ["clinical_event", "specimen", "group"].includes(lm.nodes.get(p.id)!.kind) ? 1 : branch.has(p.id) ? 2 : 3;
   const candidates = points
     .filter((p) => p.active && norm(p.p) < 0.975)
-    .sort((a, b) => norm(a.p) - norm(b.p));
+    .sort((a, b) => priority(a) - priority(b) || norm(a.p) - norm(b.p));
   for (const p of candidates) {
     if (labels.length >= (width < 600 ? 12 : 24)) break;
     const n = lm.nodes.get(p.id)!,
-      info = preview(lm, n, scope),
-      chosen = p.id === selected;
+      info = preview(lm, n, scope, options.canonicalUnits),
+      chosen = p.id === selected,
+      centered = p.id === centerId;
     const caption = graphCaption(lm,n);
     const remembered = previous.get(p.id);
     const distance = norm(p.p),
-      typography = lensTypography(distance);
-    const { detailSize, metaSize } = typography;
+      typography = lensTypography(distance, textScale);
+    // The wider leave threshold prevents a metadata line fluttering at focus.
+    const detailLevel = distance < (remembered?.detailLevel === "near" ? 0.52 : 0.44) ? "near" : "context";
     const weight = chosen ? 600 : 500;
-    const valueFont = `${detailSize}px ${family}`,
-      metaFont = `${metaSize}px ${family}`;
-    const brief = info.content
+    const fullBrief = n.kind === "observation" ? info.content : info.content
           .replace(/дослідження|досліджень/g, "досл.")
           .replace(/результатів|результати|результат/g, "рез.");
-    // Focus is already named in the fixed orientation bar. Do not add/remove
-    // a line inside the moving label when nearest-node identity changes.
-    const meta = chosen ? "Обрано" : "";
     const widths = width < 600 ? [224, 200, 180] : [320, 278, 236];
+    // Center presence takes precedence over peripheral anchor memory. Compact
+    // compositions retain the entire title and actual observation value; only
+    // redundant navigation metadata yields to space around the center node.
+    const availableVariants = centered ? [3, 4, 5, 6, 7, 8, 0, 1, 2] : [0, 1, 2];
+    const rememberedVariant = remembered && availableVariants.includes(remembered.variant) ? remembered.variant : null;
     const variants = remembered
-      ? moving ? [remembered.variant] : [remembered.variant, ...[0, 1, 2].filter(i => i !== remembered.variant)]
-      : [0, 1, 2];
+      ? moving && !centered && rememberedVariant !== null ? [rememberedVariant]
+        : [...(rememberedVariant === null ? [] : [rememberedVariant]), ...availableVariants.filter(i => i !== rememberedVariant)]
+      : availableVariants;
+    const attempts = centered && moving && remembered
+      ? [...variants.map(variant => ({ variant, releaseAnchor: false })), ...variants.map(variant => ({ variant, releaseAnchor: true }))]
+      : variants.map(variant => ({ variant, releaseAnchor: false }));
     let placed = false;
-    for (const variant of variants) {
+    for (const { variant, releaseAnchor } of attempts) {
       // Typeset once in a fixed coordinate system; scale that composition.
       // No 1/2/3-line or width switch at arbitrary lens radii.
-      const longestWord = Math.max(...caption.title.split(/\s+/).map(word => measure(word, `600 21px ${family}`)));
-      const baseWidth = Math.min(width - 24, Math.max(widths[variant], longestWord + 8));
-      let baseSize = 21;
+      const compact = variant >= 3;
+      const compactIndex = variant - 3;
+      const baseTitleSize = compact ? [18, 16, 14, 12, 14, 12][compactIndex] : 21;
+      const targetWidth = compact ? [210, 166, 126, 180, 180, 140][compactIndex] : widths[variant];
+      const { detailSize, metaSize } = compact
+        ? { detailSize: Math.min(typography.detailSize, 14 * textScale), metaSize: Math.min(typography.metaSize, 10 * textScale) }
+        : typography;
+      const valueFont = `${detailSize}px ${family}`, metaFont = `${metaSize}px ${family}`;
+      const meta = chosen && !compact ? "Обрано" : "";
+      const brief = compact && n.kind !== "observation" ? "" : fullBrief;
+      const longestWord = Math.max(...caption.title.split(/\s+/).map(word => measure(word, `600 ${baseTitleSize * textScale}px ${family}`)));
+      const baseWidth = Math.min(width - 24, Math.max(targetWidth * textScale, longestWord + 8));
+      let baseSize = baseTitleSize * textScale;
       let lines = wrapText(caption.title, baseWidth - 8, measure, `600 ${baseSize}px ${family}`, Infinity);
-      while (lines.length > (n.kind === "finding" ? 4 : 3) && baseSize > 15) {
+      while (lines.length > (n.kind === "finding" ? 4 : 3) && baseSize > 15 * textScale) {
         baseSize--;
         lines = wrapText(caption.title, baseWidth - 8, measure, `600 ${baseSize}px ${family}`, Infinity);
       }
-      const titleSize = 11.5 + (baseSize - 11.5) * Math.max(0, 1 - distance) ** 0.8;
+      const titleSize = 11.5 * textScale + (baseSize - 11.5 * textScale) * Math.max(0, 1 - distance) ** 0.8;
       const titleFont = `${weight} ${titleSize}px ${family}`;
       const scale = titleSize / baseSize;
       const limit = (baseWidth - 8) * scale + 8;
-      const dateText =
-        n.kind === "clinical_event" || n.kind === "temporal_relation"
+      const dateText = variant < 7 &&
+        (n.kind === "clinical_event" || n.kind === "temporal_relation" || (!compact && detailLevel === "near" && ["observation", "finding", "specimen"].includes(n.kind)))
           ? lm.times.get(n.id)!.text
           : "";
       // Reserve for the worst relative font/width ratio at the rim. These
       // line breaks stay fixed throughout a drag, just like the title.
-      const outerType=lensTypography(1), innerType=lensTypography(0);
+      const outerType=lensTypography(1, textScale), innerType=compact
+        ? { ...lensTypography(0, textScale), metaSize, detailSize }
+        : lensTypography(0, textScale);
       const stableDateWidth=(baseWidth-8)*Math.min(1,(outerType.titleSize/baseSize)/(outerType.metaSize/innerType.metaSize));
       const stableValueWidth=(baseWidth-8)*Math.min(1,(outerType.titleSize/baseSize)/(outerType.detailSize/innerType.detailSize));
       const dateLines = dateText
@@ -405,12 +496,12 @@ export function placeLabels(
         return {x: p.x + dx * reach - w / 2, y: p.y + dy * reach - h / 2};
       });
       const anchors = remembered
-        ? moving ? [0,-1,1,-2,2].map(d => (remembered.anchor + d + 32) % 32)
+        ? moving && !releaseAnchor ? [0,-1,1,-2,2].map(d => (remembered.anchor + d + 32) % 32)
           : [remembered.anchor, ...positions.map((_, i) => i).filter(i => i !== remembered.anchor)]
         : positions.map((_, i) => i);
       const trials = anchors
         .map((anchor) => ({ ...positions[anchor], w, h, anchor }))
-        .filter(b => !moving || !remembered || Math.hypot(
+        .filter(b => releaseAnchor || !moving || !remembered || Math.hypot(
           b.x - remembered.x - (p.x - remembered.nodeX),
           b.y - remembered.y - (p.y - remembered.nodeY)) < 24)
         .filter(
@@ -423,14 +514,15 @@ export function placeLabels(
         .filter((b) => !labels.some((other) => overlaps(b, other, 9)))
         .filter(
           (b) =>
-            !points.some((o) =>
-              overlaps(b, {
-                x: o.x - o.radius - 6,
-                y: o.y - o.radius - 6,
-                w: (o.radius + 6) * 2,
-                h: (o.radius + 6) * 2,
-              }),
-            ),
+            !points.some((o) => {
+              const clearance = compact ? 3 : 6;
+              return overlaps(b, {
+                x: o.x - o.radius - clearance,
+                y: o.y - o.radius - clearance,
+                w: (o.radius + clearance) * 2,
+                h: (o.radius + clearance) * 2,
+              });
+            }),
         );
       // Protect the active branch. Faint context strokes may sit behind the
       // existing text halo; treating them as solid obstacles made titles flee
@@ -461,15 +553,16 @@ export function placeLabels(
       trials.sort((a,b) => remembered
         ? Math.hypot(a.x - remembered.x, a.y - remembered.y) - Math.hypot(b.x - remembered.x, b.y - remembered.y)
         : breathingRoom(b) - breathingRoom(a) + 10 * (quietness(b) - quietness(a)));
-      const allowOwn = n.kind !== "observation";
+      const allowOwn = centered || n.kind !== "observation";
       const box = trials.find(b => b.anchor === remembered?.anchor && clear(b, !allowOwn)) ||
         trials.find((b) => clear(b, true)) || (allowOwn ? trials.find((b) => clear(b, false)) : undefined);
       if (!box) continue;
-      const textAnchor = moving && remembered ? remembered.textAnchor :
+      const textAnchor = moving && remembered && box.anchor === remembered.anchor ? remembered.textAnchor :
         p.x >= box.x + box.w ? "end" : p.x <= box.x ? "start" : "middle";
       const textLeft = box.x + 4, textRight = box.x + box.w - 4 - (caption.disclosure ? 16 : 0);
       labels.push({
         ...box,
+        detailLevel,
         textAnchor,
         textX: textAnchor === "end" ? textRight : textAnchor === "start" ? textLeft : (textLeft + textRight)/2,
         variant,
@@ -485,6 +578,8 @@ export function placeLabels(
         dateLineHeight,
         ...typography,
         titleSize,
+        detailSize,
+        metaSize,
         contentLines,
         detailLineHeight,
         disclosure: caption.disclosure,

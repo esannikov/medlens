@@ -1,0 +1,8 @@
+{
+  "role": "frozen-control-before-evolution",
+  "source_commit": "cb3fb4def087314ee8def545c51060c99bfeb23e",
+  "case_id": "CASE024",
+  "projection_sha256": "d37bb9a1ee6af55b2653094a14d6504f4b378fecec2c6c8d5f8d81abd6c4d846",
+  "javascript": "assets/index-BuaP7tSz.js",
+  "stylesheet": "assets/index-DNnJyHrv.css"
+}

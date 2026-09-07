@@ -1,0 +1,175 @@
+.focus-app { height: 100dvh; min-height: 560px; overflow: hidden; }
+.focus-header { height: 52px; gap: 20px; padding: 0 18px; }
+.focus-header h1 { font-size: 17px; }
+.lab-entry { color: var(--purple); font-size: 12px; min-height: 34px; white-space: nowrap; }
+.focus-toolbar { min-height: 60px; padding: 8px 16px; gap: 12px; flex-shrink: 0; }
+.focus-toolbar nav button { padding: 8px 13px; }
+.search-anchor { flex: 1; min-width: 140px; position: relative; }
+.focus-search { width: 100%; margin: 0; }
+.focus-search input { min-width: 0; font-size: 14px; }
+.search-popover { position: absolute; z-index: 70; top: calc(100% + 6px); left: 0; width: max(100%, 450px); max-width: calc(100vw - 32px); max-height: min(650px, calc(100dvh - 130px)); overflow: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: 0 12px 32px #302b391c; overscroll-behavior: contain; }
+.search-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.search-heading h2 { font-size: 17px; margin: 0; }
+.search-heading > button { min-width: 36px; min-height: 36px; }
+.search-count { font-size: 13px; color: var(--ink); margin: 12px 0 4px; }
+.search-results-list .node-row { padding: 12px 4px; }
+.focus-filters { flex-shrink: 0; min-height: 42px; padding: 4px 16px; gap: 10px; }
+.coverage { font-size: 12px; }
+.workspace-tools { display: flex; gap: 8px; margin-left: auto; }
+.places-control, .reading-control { position: relative; }
+.places-control > summary, .reading-control > summary { cursor: pointer; font-size: 12px; color: var(--purple); padding: 8px; min-height: 32px; border-radius: 6px; }
+.places-control > summary:hover, .reading-control > summary:hover { background: var(--soft); }
+.places-panel, .reading-panel { position: absolute; top: 100%; right: 0; z-index: 60; width: 340px; max-width: calc(100vw - 28px); max-height: min(600px, 70dvh); overflow: auto; padding: 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px #302b391a; }
+.places-panel p, .reading-panel p { font-size: 12px; }
+.places-panel h3 { font-size: 17px; }
+.place-row { display: flex; gap: 8px; align-items: start; margin: 8px 0; }
+.place-row > button:first-child { text-align: left; flex: 1; }
+.place-row small { display: block; margin-top: 4px; color: var(--muted); }
+.recent-place { display: block; text-align: left; width: 100%; margin: 6px 0; }
+.reading-panel > label { display: flex; gap: 9px; align-items: center; margin-bottom: 12px; font-size: 13px; }
+.reading-panel select { margin-left: auto; }
+.focus-workspace { flex: 1; min-height: 0; overflow: hidden; }
+.focus-workspace .graph-workspace { height: auto; min-height: 0; overflow: hidden; }
+.reader-open .focus-rail { max-height: none; min-height: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+.rail-content { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; }
+.rail-header, .rail-tabs, .study-return, .reader-context-switch, .pinned { flex-shrink: 0; }
+.rail-header { padding: 16px 18px; }
+.rail-header h2 { font-size: 21px; }
+.reader-context-switch { font-size: 12px; padding: 10px 14px; align-items: start; }
+.reader-context-switch span { flex: 1; min-width: 0; line-height: 1.4; }
+.reader-context-switch button { min-height: 34px; font-size: 11px; }
+.focus-breadcrumb { min-height: 42px; height: 42px; flex-shrink: 0; }
+.focus-breadcrumb button { font-size: 12px; }
+.lens-view .lens { min-height: 0; height: auto; flex: 1; }
+.lens-orientation { min-height: 58px; padding: 9px 16px; flex-shrink: 0; }
+.focus-caption-text strong { font-size: 13px; }
+.focus-caption-text > span { font-size: 12px; }
+.lens-key { flex-shrink: 0; padding: 5px 8px; font-size: 11px; }
+.graph-foot { flex-shrink: 0; min-height: 32px; font-size: 11px; }
+.focus-footer { min-height: 25px; flex-shrink: 0; font-size: 10px; }
+.node-row.out-of-scope { opacity: 1; background: #f5f1f8; }
+.node-row.out-of-scope small { color: #68596d; }
+.muted { color: #6e6076; }
+.table-scroll { scroll-padding-top: 48px; }
+.table-scroll button { scroll-margin-top: 48px; }
+.table-view td { font-size: 12px; }
+.mobile-reader-bar { display: none; }
+.source-path { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.source-path button { max-width: 100%; font-size: 12px; text-align: left; padding: 5px 8px; }
+.source-text mark { background: #e5dcef; color: #302b39; border-radius: 2px; }
+.comparison-reader-note { background: #f1eaf8; color: #594069; padding: 10px; border-radius: 6px; font-size: 12px; }
+.series-points [role="button"] { cursor: pointer; }
+.series-points [role="button"]:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; background: var(--paper); padding: 12px; color: var(--purple); }
+.skip-link:focus { top: 8px; }
+.record-insights { margin: 20px 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.record-insights h3 { font-size: 15px; }
+.quality-list { padding-left: 18px; font-size: 13px; line-height: 1.55; }
+.quality-list li { margin-bottom: 8px; }
+.record-states { font-size: 12px; }
+.record-states dt { color: var(--muted); }
+.series-points { width: 100%; height: auto; }
+.series-records { padding: 0; list-style: none; }
+.series-records button { width: 100%; text-align: left; margin: 4px 0; }
+.series-records small { display: block; color: var(--muted); }
+.quality-list li > span { display: block; }
+.record-states > div { margin-bottom: 10px; }
+.record-states small { display: block; margin-top: 4px; }
+.series-records > li { margin: 12px 0; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.series-record-open > span { display: block; }
+.series-exclusion { margin-top: 6px; color: #795324; }
+.timeline-compact { padding: 7px 16px; flex-shrink: 0; min-height: 54px; }
+.timeline-compact .time-summary { align-items: center; gap: 12px; }
+.timeline-compact .time-summary strong { font-size: 12px; }
+.timeline-compact .time-summary span { font-size: 11px; }
+.timeline-compact .time-buttons { gap: 4px; }
+.timeline-compact .time-buttons button, .timeline-compact .time-buttons input { min-height: 34px; font-size: 11px; padding: 5px 7px; }
+.timeline-compact .time-buttons input { width: 130px; }
+.task-filters { margin-top: 12px; font-size: 12px; }
+.filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.filter-grid label { display: flex; flex-direction: column; gap: 5px; }
+.filter-grid input, .filter-grid select { min-width: 0; width: 100%; font-size: 13px; }
+.embedded .focus-header { display: none; }
+.embedded .focus-toolbar { flex-wrap: wrap; }
+.embedded .focus-toolbar .search-anchor { min-width: 180px; }
+.embedded .prototype-tag { display: none; }
+.experiment-app { min-height: 100dvh; }
+.lens-upgraded { position: relative; }
+.lens-upgraded .lens-orientation { height: auto; min-height: 50px; padding-block: 5px; }
+.lens-upgraded .lens { min-height: 220px; }
+.lens-upgraded .lens-compass { position: absolute; z-index: 3; right: 12px; top: 64px; flex-direction: column; padding: 0; }
+.lens-upgraded .lens-compass button { min-height: 32px; justify-content: start; padding: 3px 7px; }
+.lens-upgraded .lens-keyboard-help { display: none; }
+.lens-upgraded .lens-key { padding: 2px 8px; min-height: 20px; }
+.lens-upgraded .lens-coverage { position: relative; }
+.lens-upgraded .lens-coverage-summary { min-height: 40px; flex-wrap: nowrap; }
+.lens-upgraded .lens-coverage-content { position: absolute; left: 8px; right: 8px; bottom: 100%; z-index: 24; max-height: min(340px, 45dvh); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 -8px 24px #302b391a; padding-top: 10px; }
+.lens-navigation-menu { position: relative; }
+.lens-navigation-menu > summary { cursor: pointer; padding: 10px 7px; font-size: 11px; min-height: 42px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+.lens-navigation-menu[open] > .lens-direction-controls { position: absolute; bottom: 100%; left: 0; z-index: 20; width: 210px; padding: 8px; margin: 0; background: var(--paper); border: 1px solid var(--line); border-radius: 8px 8px 0 0; }
+.lens-navigation-menu > p { display: none; }
+.lens-navigation-menu[open] > p { display: block; position: absolute; bottom: calc(100% + 60px); left: 0; z-index: 20; width: 210px; margin: 0; padding: 8px; font-size: 11px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+.search-popover > .help { font-size: 12px; margin-bottom: 8px; }
+.search-count { font-size: 12px; line-height: 1.5; }
+@media (max-width: 1050px) {
+  .focus-toolbar { gap: 8px; }
+  .focus-toolbar nav button { padding-inline: 8px; }
+  .prototype-tag { display: none; }
+  .workspace-tools { margin-left: 0; }
+  .focus-filters { flex-wrap: wrap; }
+}
+@media (max-width: 760px) {
+  .focus-app { min-height: 540px; }
+  .focus-header { height: 46px; padding: 0 12px; gap: 10px; }
+  .focus-header h1 { font-size: 15px; }
+  .focus-header h1 span { font-size: 10px; }
+  .lab-entry { margin-left: auto; font-size: 11px; white-space: normal; max-width: 105px; }
+  .focus-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 7px 12px; }
+  .focus-toolbar nav { grid-column: 1/-1; }
+  .focus-toolbar nav button { flex: 1; min-height: 36px; font-size: 12px; }
+  .search-anchor { grid-column: 1/-1; width: 100%; min-width: 0; }
+  .focus-toolbar .time-toggle, .focus-toolbar .reader-toggle { min-height: 34px; font-size: 12px; }
+  .focus-search { min-height: 38px; }
+  .search-popover { position: absolute; width: 100%; max-width: none; max-height: calc(100dvh - 154px); padding: 12px; }
+  .focus-filters { padding: 2px 12px; min-height: 66px; gap: 4px 8px; }
+  .domain-filters { width: 100%; flex: 0 0 100%; }
+  .focus-filters > label, .coverage { font-size: 11px; }
+  .workspace-tools { margin-left: auto; }
+  .places-control > summary, .reading-control > summary { font-size: 11px; padding: 5px; min-height: 28px; }
+  .focus-workspace { min-height: 0; }
+  .focus-workspace .graph-workspace { height: 100%; min-height: 0; }
+  .focus-breadcrumb { min-height: 35px; height: 35px; padding: 0 10px; }
+  .focus-breadcrumb button { font-size: 11px; }
+  .lens-orientation { min-height: 46px; padding: 6px 10px; }
+  .focus-caption-text strong { font-size: 12px; }
+  .focus-caption-text > span { font-size: 11px; }
+  .lens-key { display: none; }
+  .lens-upgraded .lens-compass { display: none; }
+  .lens-upgraded .lens-orientation { min-height: 50px; }
+  .lens-upgraded .lens-zoom select { position: static; max-width: 115px; min-width: 0; }
+  .lens-upgraded .lens-zoom > button:nth-of-type(2) { max-width: 82px; }
+  .lens-upgraded .lens-zoom button { min-width: 36px; }
+  .lens-upgraded .lens-coverage-summary { padding-inline: 10px; }
+  .lens-upgraded .lens-coverage-summary > button { font-size: 11px; white-space: nowrap; }
+  .lens-upgraded .lens { min-height: 240px; }
+  .graph-foot { display: none; }
+  .focus-footer { display: none; }
+  .reader-open .focus-rail { position: fixed; z-index: 50; bottom: 0; left: 0; right: 0; top: auto; height: min(68dvh, 660px); max-height: 68dvh; background: var(--paper); border-top: 1px solid #cbbbdc; border-radius: 16px 16px 0 0; box-shadow: 0 -12px 30px #302b391c; padding-bottom: env(safe-area-inset-bottom); }
+  .mobile-reader-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--soft); flex-shrink: 0; }
+  .mobile-reader-bar > span { flex: 1; font-size: 12px; max-height: 38px; overflow: auto; }
+  .mobile-reader-bar button { min-width: 40px; min-height: 36px; }
+  .rail-header { padding: 12px 16px; }
+  .rail-header h2 { font-size: 19px; }
+  .rail-content { padding: 16px; }
+  .time-is-open .focus-workspace { min-height: 180px; }
+  .time-is-open > .timeline { max-height: 34dvh; overflow: auto; }
+  .timeline-compact .time-summary { display: flex; flex-wrap: nowrap; }
+  .timeline-compact .time-summary > div:first-child { flex: 1; }
+  .timeline-compact .time-summary span { display: none; }
+  .timeline-compact .time-buttons > button:last-child { display: none; }
+  .timeline-compact .time-buttons input { width: 119px; }
+  .timeline-compact { padding: 6px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-popover, .focus-rail { scroll-behavior: auto; }
+}

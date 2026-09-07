@@ -1,0 +1,27 @@
+{
+  "schema": "medlens.publication/1.0",
+  "case_id": "CASE024",
+  "exported_on": "2026-09-06",
+  "source": "https://esannikov.github.io/hematoboard/case024/public-dashboard.v1.json",
+  "source_package_sha256": "e66ed2645575028c2ff9d211dcb87f473b18cc2a02b030bd07a2eceef9832a7e",
+  "source_graph_file_sha256": "2f381b72f78a28b8892a781c222d37541d7bc8249091c104ff1764e60c8f10d3",
+  "patient_graph_sha256": "edfaf88447668409717873f4b0cb9c38a7603f01b94c668b76a8c0504c9b422f",
+  "projection_sha256": "d37bb9a1ee6af55b2653094a14d6504f4b378fecec2c6c8d5f8d81abd6c4d846",
+  "privacy_receipt_sha256": "012b597e5ae667bbe753d1179b9ab702c10f82dc489181468d67ff5146c5e94c",
+  "external_publication_authorized": true,
+  "objects": 185,
+  "results": 148,
+  "structural_edges": 306,
+  "component_available": true,
+  "case_wired": true,
+  "technical_verification": "npm test, npm run build, plus separate live-browser deployment check",
+  "clinician_accepted": false,
+  "exclusions": [
+    "original documents",
+    "images",
+    "local paths",
+    "session credentials",
+    "candidate hypotheses",
+    "private receipts"
+  ]
+}

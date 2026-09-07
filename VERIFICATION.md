@@ -91,3 +91,54 @@ do not imply clinical acceptance.
 A browser run that deliberately aborted all three WOFF2 requests selected the
 explicit system-monospace fallback and retained all 185 table rows. The three
 expected failed-resource console entries belong to that fault-injection test.
+
+## Stable improvements and experimental forks — 2026-09-07
+
+User approved the20-item audit plan with substantial geometry changes isolated.
+Stable implementation: mandatory central title, exact active-branch coverage and
+full overflow list, navigation/read distinction, A∪B table and A-only source
+access, viewport shell/mobile reader/search, text scale, keyboard destinations,
+peripheral study identity, compass, typed extra edges and source trace, explicit
+date basis, safe unit notation, source-quality states, strict series and local
+revision-pinned bookmarks. Dedicated routes: paired interactive lenses, regrouping
+by source-backed attributes/mentions, and two independently selectable comparison
+panes. Frozen control build contains the same data from pre-change commitcb3fb4d.
+
+Two batched visual inspections were followed by a fresh independent finish review.
+It requested five material fixes: central identity, A-only source reading, keyboard
+focus, scatter point activation and issued labels in regroup. Those five fixes were
+implemented together and recaptured for a verdict pass; reviewer result recorded
+separately rather than assumed by this implementation receipt.
+
+Current tests PASS:185objects148results,756layouts,178motion checks,264coverage
+cases,189exact structural path cases,945central positions,270central pan samples
+(maximum17.194px step), strict source/unit/series/query cases, symmetric date union,
+revision restore validation,18experimental scopes/7,063membership checks and
+control-data equality. No missing central labels in the tested positions.
+
+Actual Playwright: CT center6/6direct labels, smallpan5/6+1explicit record;
+mobile130%0/6+6explicit record actions, with central title present. These results
+do not claim all text simultaneously fits a phone. Mobile search and reader are
+inside viewport. A∪B table contains185real objects; A-only source opens without
+changing B=30.03.2026. Three consecutive arrow keys retain SVG focus and navigate;
+Enter transfers focus to reader. Saved place actually restores CT and text130%.
+An explicitly labelled synthetic two-point fixture verified pointer and keyboard
+scatter actions. It existed only in test-browser fetch interception and was removed
+before returning to the real dataset. Regroup retains185IDs and explicit issued
+markers; paired lenses pan independently; laboratory has two frames. No horizontal
+page overflow or page errors in the sampled workflows.
+
+The main final detector reported the known false positive for `stroke-width`.
+An experimental worker ran an earlier scoped detector with no findings before its
+last refactor; no clean global detector claim is inferred from that early scan.
+No full screen-reader/real-device/clinical evaluation or performance benchmark is
+claimed. All public clinical JSON bytes remain unchanged. Shared-source candidates
+were not merged, missing units not filled, anatomical mappings not fabricated,
+and absent methods were not treated as evidence of measurement compatibility.
+
+Finish verdict: all five requested material fixes scored resolved. A second,
+keyboard-only correction unified Arrow and Enter target during animation;
+Playwright confirmed immediate ArrowRight→Enter with data-moving=true opens the
+new group ID, not the previous center. The reviewer disposition is `ship` for the
+five-item fix list, not a new whole-product audit. See docs/IMPLEMENTED.md for
+implemented, experimental and data-dependent distinctions across all20 points.

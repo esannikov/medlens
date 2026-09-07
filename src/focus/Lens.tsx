@@ -1,7 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   clampDisk,
   focusPoint,
+  geodesic,
   lerpVec,
   norm,
   type LensModel,
@@ -10,6 +11,10 @@ import {
 } from "./model.ts";
 import {
   lensGeometry,
+  activeResultCoverage,
+  exactStructuralEdges,
+  keyboardDestination,
+  structuralRelationNames,
   graphCaption,
   connectionStyle,
   lineProfiles,
@@ -20,8 +25,9 @@ import {
   type Measure,
   type Label,
 } from "./layout.ts";
-import { NodeGlyph, NodeShape } from "./NodeGlyph";
+import { NodeGlyph, NodeShape, StudyMark } from "./NodeGlyph";
 import { LENS_FONT_FAMILY } from "./typography.ts";
+import "./lens-upgrades.css";
 
 export function Lens({
   lm,
@@ -30,9 +36,16 @@ export function Lens({
   scope,
   centerKey,
   onSelect,
+  onNavigate,
   onRead,
   onFocusChange,
   fontFamily = LENS_FONT_FAMILY,
+  textScale = 1,
+  canonicalUnits = false,
+  showRelations = false,
+  sourceTrace = false,
+  cameraTarget,
+  onReadSource,
 }: {
   lm: LensModel;
   selected: string;
@@ -40,9 +53,16 @@ export function Lens({
   scope: Scope;
   centerKey: number;
   onSelect: (id: string) => void;
+  onNavigate?: (id: string) => void;
   onRead: (id: string) => void;
   onFocusChange: (id: string) => void;
   fontFamily?: string;
+  textScale?: number;
+  canonicalUnits?: boolean;
+  showRelations?: boolean;
+  sourceTrace?: boolean;
+  cameraTarget?: string;
+  onReadSource?: (id: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
     drag = useRef<{ x: number; y: number; focus: Vec; moved: boolean } | null>(
@@ -51,6 +71,9 @@ export function Lens({
     frame = useRef(0);
   const volumeId = `lens-volume-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const labelMemory = useRef(new Map<string, Label>());
+  const svg = useRef<SVGSVGElement>(null);
+  const [coverageOpen, setCoverageOpen] = useState(false);
+  const [relationsOpen, setRelationsOpen] = useState(false);
   const glint = useRef<SVGGElement>(null);
   const glintAnimation = useRef<Animation | null>(null);
   const [lineProfile, setLineProfile] = useState<LineProfile>("balanced");
@@ -80,7 +103,7 @@ export function Lens({
   }, []);
   useEffect(() => {
     const from = currentFocus.current,
-      target = lm.nodes.get(selected)!.p2;
+      target = lm.nodes.get(cameraTarget || selected)!.p2;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (norm(focusPoint(target, from)) < 1e-6 || reduced) {
       currentFocus.current = target;
@@ -106,7 +129,7 @@ export function Lens({
     };
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
-  }, [selected, centerKey, lm]);
+  }, [selected, cameraTarget, centerKey, lm]);
   const geometry = useMemo(
     () =>
       lensGeometry(lm, selected, scope, focus, size.width, size.height, zoom),
@@ -127,14 +150,15 @@ export function Lens({
         labelMemory.current,
         moving,
         fontFamily,
+        { textScale, centerId, canonicalUnits },
       ),
     // Motion flags change feedback, not geometry. Pointerup must retain the
     // last rendered placement rather than start a second, unlocked layout.
-    [lm, selected, scope, points, paths, size, measure, fontFamily],
+    [lm, selected, scope, points, paths, size, measure, fontFamily, textScale, centerId, canonicalUnits],
   );
   // Reset before committing the new layout, not in a later passive effect.
   // Otherwise closing the reader erases the anchors needed by the first drag.
-  useLayoutEffect(() => { labelMemory.current.clear(); }, [lm, size.width, size.height, scope]);
+  useLayoutEffect(() => { labelMemory.current.clear(); }, [lm, size.width, size.height, scope, textScale, canonicalUnits]);
   useLayoutEffect(() => {
     labels.forEach(label => labelMemory.current.set(label.id, label));
   }, [labels]);
@@ -142,7 +166,7 @@ export function Lens({
   const hoverNode = hovered ? lm.nodes.get(hovered) : null;
   const focusNode = lm.nodes.get(centerId)!,
     selectedNode = lm.nodes.get(selected)!,
-    info = preview(lm, focusNode, scope);
+    info = preview(lm, focusNode, scope, canonicalUnits);
   const offCenter = norm(focusPoint(selectedNode.p2, focus)) > 0.12;
   const highlighted = new Set(
     lm.ancestors(hovered || centerId).map((n) => n.id),
@@ -151,6 +175,22 @@ export function Lens({
   const branch = new Set(branchRoot.id === lm.root
     ? [lm.root, ...branchRoot.children] : [branchRoot.id, ...branchRoot.descendants]);
   const pointsById = new Map(points.map(p => [p.id,p]));
+  const coverage = activeResultCoverage(lm, centerId, scope, labels);
+  const coverageOwnerId = coverage?.owner.id;
+  useEffect(() => { setCoverageOpen(false); }, [coverageOwnerId]);
+  const sourceEdges = useMemo(() => sourceTrace ? exactStructuralEdges(lm, selected, true) : [], [lm, selected, sourceTrace]);
+  const exactEdges = useMemo(() => {
+    const edges = showRelations ? exactStructuralEdges(lm, selected) : [];
+    return [...new Map([...edges, ...sourceEdges].map(edge => [edge.id, edge])).values()];
+  }, [lm, selected, showRelations, sourceEdges]);
+  const sourceEdgeIds = new Set(sourceEdges.map(edge => edge.id));
+  const tracedNodes = new Set(sourceEdges.flatMap(edge => [edge.source, edge.target]));
+  const structuralPaths = exactEdges.map(edge => {
+    const from = pointsById.get(edge.source)!, to = pointsById.get(edge.target)!;
+    const projected = geodesic(from.p, to.p).map(([x, y]) => [size.width / 2 + x * radius, size.height / 2 - y * radius]);
+    return { ...edge, trace: sourceEdgeIds.has(edge.id), d: projected.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ") };
+  });
+  const sources = selectedNode.object ? lm.m.sourceFor(selectedNode.object) : [];
   const paintedPaths = paths.map(path => {
     const from=pointsById.get(path.source)!, to=pointsById.get(path.target)!;
     const role = from.active && to.active && highlighted.has(path.source) && highlighted.has(path.target)
@@ -187,13 +227,36 @@ export function Lens({
     setMoving(false);
     setHovered(null);
   };
+  const directions = [
+    { id: "parent", label: "До батьківського запису", path: "M15 6l-6 6 6 6" },
+    { id: "child", label: "До першого дочірнього запису", path: "M9 6l6 6-6 6" },
+    { id: "previous", label: "Попередній запис у гілці", path: "M6 15l6-6 6 6" },
+    { id: "next", label: "Наступний запис у гілці", path: "M6 9l6 6 6-6" },
+  ] as const;
+  const navigate = (id: string, direction: typeof directions[number]["id"] | "root") => {
+    const destination = keyboardDestination(lm, id, scope, direction);
+    if (destination) {
+      drag.current = null;
+      (onNavigate || onSelect)(destination);
+      svg.current?.focus({ preventScroll: true });
+    }
+  };
+  const handleNavigation = (e: KeyboardEvent, id: string) => {
+    const keyDirections = { ArrowLeft: "parent", ArrowRight: "child", ArrowUp: "previous", ArrowDown: "next", Home: "root" } as const;
+    const direction = keyDirections[e.key as keyof typeof keyDirections];
+    if (direction && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      navigate(id, direction);
+    }
+  };
   return (
-    <section className="lens-view" aria-label="Лінза досьє">
+    <section className="lens-view lens-upgraded" aria-label="Лінза досьє" data-text-scale={textScale} data-unit-mode={canonicalUnits ? "canonical" : "source"}>
       <div className="lens-orientation">
-        <div data-focus-caption={centerId}>
-          <NodeGlyph kind={focusNode.kind} color={focusNode.color} />
+        <div data-focus-caption={centerId} data-center-caption-present="true">
+          <NodeGlyph kind={focusNode.kind} color={focusNode.color} eventKind={focusNode.object?.payload.event_kind} />
           <span className="focus-caption-text">
-            <strong title={focusNode.title}>У фокусі: {focusNode.kind === "finding" ? "Знахідка" : graphCaption(lm,focusNode).title}</strong>
+            <strong title={focusNode.title} aria-label={`У фокусі: ${focusNode.title}`}>У фокусі: {graphCaption(lm,focusNode).title}</strong>
             <span>
               {[info.kind, info.content].filter(Boolean).join(" · ")}
               {info.time ? ` · ${info.time}` : ""}
@@ -204,13 +267,35 @@ export function Lens({
           {focusNode.children.length ? "Відкрити вміст" : "Читати запис"}
         </button>
       </div>
+      <nav className="lens-compass" aria-label="Розділи досьє">
+        {lm.groups.map(id => {
+          const group = lm.nodes.get(id)!;
+          const active = lm.groupFor(centerId) === id;
+          return <button key={id} aria-pressed={active} data-compass-group={id} onClick={() => onSelect(id)}
+            disabled={!lm.contextual(id, scope)} title={`Перейти: ${group.title}`}>
+            <NodeGlyph kind={id === "group:temporal" ? "temporal_relation" : "clinical_event"} eventKind={id.slice(6)} color={group.color} />
+            {group.title}
+          </button>;
+        })}
+      </nav>
       <div className="lens" ref={host} data-lens-mode="2d" data-moving={moving}>
         <svg
+          ref={svg}
           className="lens-svg"
           style={{fontFamily}}
           viewBox={`0 0 ${size.width} ${size.height}`}
           role="group"
+          tabIndex={0}
           aria-label="Інтерактивна 2D-лінза графа"
+          aria-describedby={`${volumeId}-keyboard`}
+          onKeyDown={e => {
+            const keyboardTarget=moving ? (cameraTarget || selected) : centerId;
+            handleNavigation(e, keyboardTarget);
+            if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+              e.preventDefault();
+              onRead(keyboardTarget);
+            }
+          }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             cancelAnimationFrame(frame.current);
@@ -276,6 +361,9 @@ export function Lens({
             </radialGradient>
             <linearGradient id={`${volumeId}-gleam`}><stop offset="0" stopColor="#fff" stopOpacity="0"/><stop offset="0.48" stopColor="#fff"/><stop offset="1" stopColor="#fff" stopOpacity="0"/></linearGradient>
             <filter id={`${volumeId}-glow`} filterUnits="userSpaceOnUse" x="0" y="0" width={size.width} height={size.height}><feGaussianBlur stdDeviation="1.4"/></filter>
+            <marker id={`${volumeId}-edge-arrow`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M1 1l6 3-6 3" fill="none" stroke="#504165" strokeWidth="1.2" />
+            </marker>
           </defs>
           <circle
             className="lens-boundary"
@@ -340,6 +428,14 @@ export function Lens({
               );
             })}
           </g>
+          <g className="lens-structural-edges" fill="none" pointerEvents="none">
+            {structuralPaths.map(path => <path key={path.id} d={path.d} data-structural-edge={path.id}
+              data-structural-source={path.source} data-structural-target={path.target} data-structural-relation={path.relation}
+              data-source-path={path.trace} stroke={path.trace ? "#824b16" : "#504165"} strokeWidth={path.trace ? 2 : 1.6}
+              strokeDasharray={path.trace ? undefined : "8 3"} opacity="0.86" markerEnd={`url(#${volumeId}-edge-arrow)`}>
+              <title>{structuralRelationNames[path.relation] || path.relation}: {lm.nodes.get(path.source)!.title} → {lm.nodes.get(path.target)!.title}</title>
+            </path>)}
+          </g>
           <g>
             {points.map((p) => {
               const hasLabel = labels.some((b) => b.id === p.id);
@@ -347,7 +443,7 @@ export function Lens({
                 expanded = p.detail,
                 chosen = p.id === selected,
                 hot = p.id === hovered,
-                content = preview(lm, n, scope);
+                content = preview(lm, n, scope, canonicalUnits);
               const visible =
                 p.x >= 0 && p.x <= size.width && p.y >= 0 && p.y <= size.height;
               return (
@@ -366,10 +462,12 @@ export function Lens({
                   aria-label={`${content.kind}: ${n.title}. ${content.content}. ${content.action}`}
                   aria-hidden={!visible || hasLabel}
                 >
+                  <title>{`${content.kind}: ${n.title}. ${content.content}${content.time ? `. ${content.time}` : ""}`}</title>
                   <circle
-                    r={expanded ? Math.max(14, p.radius + 4) : p.radius + 2}
+                    r={expanded || n.kind === "clinical_event" || n.kind === "group" ? Math.max(22, p.radius + 4) : p.radius + 2}
                     fill="transparent"
                   />
+                  {sourceTrace && (tracedNodes.has(p.id) || p.id === selected) && <circle r={p.radius + 8} fill="none" stroke="#824b16" strokeWidth="1.5" data-source-node={p.id} />}
                   {(chosen || hot || p.id === pinned || p.id === centerId) && (
                     <circle
                       r={p.radius + 5}
@@ -389,7 +487,7 @@ export function Lens({
                     opacity={p.active ? (expanded ? 1 : 0.68) : 0.14}
                   >
                     {p.active && (branch.has(p.id) || highlighted.has(p.id)) && expanded && <circle r={p.radius+3.5} fill={n.color} opacity="0.09" />}
-                    {expanded ? (
+                    {expanded || n.kind === "clinical_event" || n.kind === "group" ? (
                       <NodeShape
                         kind={n.kind}
                         r={p.radius}
@@ -408,14 +506,7 @@ export function Lens({
                           strokeWidth="1.2"
                         />
                       )}
-                    {expanded && n.kind === "clinical_event" && (
-                      <path
-                        d={`M${-p.radius * 0.42} -2h${p.radius * 0.84}m-${p.radius * 0.84} 4h${p.radius * 0.6}`}
-                        fill="none"
-                        stroke="#fff"
-                        strokeWidth="1.2"
-                      />
-                    )}
+                    {n.kind === "clinical_event" && <g data-study-kind={n.object?.payload.event_kind}><StudyMark eventKind={n.object?.payload.event_kind} r={p.radius} /></g>}
                   </g>
                 </g>
               );
@@ -424,7 +515,7 @@ export function Lens({
           <g className="lens-labels">
             {labels.map((b) => {
               const n = lm.nodes.get(b.id)!,
-                content = preview(lm, n, scope);
+                content = preview(lm, n, scope, canonicalUnits);
               return (
                 <g
                   key={b.id}
@@ -435,13 +526,16 @@ export function Lens({
                   data-label-distance={b.distance}
                   data-label-anchor={b.anchor}
                   data-label-disclosure={b.disclosure}
+                  data-label-detail-level={b.detailLevel}
                   textAnchor={b.textAnchor}
                   opacity={b.opacity}
                   aria-label={`${content.kind}: ${b.lines.join(" ")}. ${content.content}. ${content.time}. ${b.disclosure ? "Розгорнути повний опис" : content.action}`}
                   onClick={() => b.disclosure && !drag.current?.moved ? onRead(b.id) : choose(b.id)}
                   onKeyDown={(e) => {
+                    handleNavigation(e, b.id);
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
+                      e.stopPropagation();
                       if (b.id === selected || b.disclosure) onRead(b.id);
                       else onSelect(b.id);
                     }
@@ -524,15 +618,22 @@ export function Lens({
             <span>
               <strong>
                 {nodeKinds[hoverNode.kind]} ·{" "}
-                {preview(lm, hoverNode, scope).action}
+                {preview(lm, hoverNode, scope, canonicalUnits).action}
               </strong>
               <span>{graphCaption(lm,hoverNode).title}</span>
             </span>
           </div>
         )}
         <div className="lens-zoom">
+          <details className="lens-navigation-menu"><summary>Перейти</summary><div className="lens-direction-controls" role="group" aria-label="Перехід між записами">
+            {directions.map(direction => <button key={direction.id} title={direction.label} aria-label={direction.label}
+              disabled={!keyboardDestination(lm, centerId, scope, direction.id)} onClick={() => navigate(centerId, direction.id)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d={direction.path} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>)}
+          </div><p>Клавіші ← →: батько / дочірній запис. ↑ ↓: сусідні записи. Enter: читати.</p></details>
           <button
             aria-label="Зменшити лінзу"
+            disabled={zoom <= 0.65}
             onClick={() => setZoom((z) => Math.max(0.65, z - 0.15))}
           >
             −
@@ -545,6 +646,7 @@ export function Lens({
           </button>
           <button
             aria-label="Збільшити лінзу"
+            disabled={zoom >= 1.65}
             onClick={() => setZoom((z) => Math.min(1.65, z + 0.15))}
           >
             +
@@ -555,6 +657,66 @@ export function Lens({
           </select>
         </div>
       </div>
+      {coverage && <div className="lens-coverage" data-coverage-owner={coverage.owner.id}
+        data-coverage-result-ids={coverage.eligible.join(" ")} data-coverage-visible-ids={coverage.displayed.join(" ")}
+        data-coverage-hidden-ids={coverage.hidden.join(" ")}>
+        <div className="lens-coverage-summary">
+          <span><strong>{coverage.displayed.length} / {coverage.eligible.length}</strong> підписів у лінзі</span>
+          <button aria-expanded={coverageOpen} aria-controls={`${volumeId}-coverage`} onClick={() => setCoverageOpen(open => !open)}>
+            {coverageOpen ? "Згорнути перелік" : coverage.hidden.length ? `Без підпису: ${coverage.hidden.length} · показати` : "Усі результати"}
+          </button>
+        </div>
+        {coverageOpen && <div id={`${volumeId}-coverage`} className="lens-coverage-content">
+          <p>{coverage.owner.kind === "specimen" ? "Матеріал" : "Дослідження"}: {coverage.owner.title}.
+            {coverage.excluded.length > 0 && ` Поза поточним відбором: ${coverage.excluded.length}.`}
+            {coverage.hidden.length > 0 && " Частина підписів не вміщується або надто близько до краю. Усі результати поточного відбору доступні нижче."}
+          </p>
+          <ul>{coverage.eligible.map(id => {
+            const node = lm.nodes.get(id)!;
+            const shown = coverage.displayed.includes(id);
+            const content = preview(lm, node, scope, canonicalUnits);
+            return <li key={id} data-coverage-record={id} data-coverage-labelled={shown}>
+              <button onClick={() => onRead(id)} aria-label={`Читати: ${node.title}`}>
+                <span>{node.title}</span>
+                <span>{[content.content, content.time].filter(Boolean).join(" · ")}</span>
+                <small>{shown ? "Підпис у лінзі" : "Без читабельного підпису"}</small>
+              </button>
+              <button onClick={() => onSelect(id)} title={`У фокус: ${node.title}`} aria-label={`У фокус: ${node.title}`}>У фокус</button>
+            </li>;
+          })}</ul>
+          {!coverage.eligible.length && <p>У цьому відборі немає результатів матеріалу або дослідження.</p>}
+        </div>}
+      </div>}
+      {(showRelations || sourceTrace) && <div className="lens-relations" data-relations-selected={selected}>
+        <div className="lens-relations-summary">
+          <span>{sourceTrace ? "Шлях походження" : "Структурні зв’язки"}: {exactEdges.length} ребер пакета</span>
+          <button onClick={() => setRelationsOpen(open => !open)} aria-expanded={relationsOpen} aria-controls={`${volumeId}-relations`}>
+            {relationsOpen ? "Згорнути зв’язки" : "Показати зв’язки"}
+          </button>
+          {sourceTrace && selectedNode.object && <button onClick={() => (onReadSource || onRead)(selected)}>
+            {sources.length ? `Читати джерела (${sources.length})` : "Відкрити запис"}
+          </button>}
+        </div>
+        <p className="lens-relation-key"><span>Стрілки — точні структурні зв’язки</span><span>Дрібний пунктир — навігаційне групування</span>{sourceTrace && <span>Бурштиновий — шлях до вибраного запису</span>}</p>
+        <p className="lens-relation-key">{[...new Set(exactEdges.map(edge => edge.relation))].map(relation =>
+          <span key={relation} data-relation-legend={relation}>{structuralRelationNames[relation] || relation} · {exactEdges.filter(edge => edge.relation === relation).length}</span>)}</p>
+        {relationsOpen && <div id={`${volumeId}-relations`} className="lens-relation-content">
+          <p>Вибраний запис: {selectedNode.title}.</p>
+          {!exactEdges.length && <p>Для цього об’єкта структурних зв’язків у пакеті немає.</p>}
+          <ul>{exactEdges.map(edge => <li key={edge.id} data-edge-list-id={edge.id}>
+            <strong>{structuralRelationNames[edge.relation] || edge.relation}</strong>
+            <span><button onClick={() => onRead(edge.source)}>{lm.nodes.get(edge.source)!.title}</button><span aria-hidden="true"> → </span><button onClick={() => onRead(edge.target)}>{lm.nodes.get(edge.target)!.title}</button></span>
+            <code>{edge.id} · {edge.relation}</code>
+            {(!lm.contextual(edge.source, scope) || !lm.contextual(edge.target, scope)) && <span>Один із записів поза поточним відбором.</span>}
+          </li>)}</ul>
+          {sourceTrace && <div className="lens-source-chain">
+            <p>Джерела, прямо вказані в походженні запису або його фактів: {sources.length}.</p>
+            <ul>{sources.map(source => <li key={source.id}><code>{source.id}</code>{source.locator?.page ? ` · сторінка ${source.locator.page}` : ""}</li>)}</ul>
+            {!sources.length && <p>Пакет не містить доступного дослівного джерела для цього запису.</p>}
+          </div>}
+        </div>}
+      </div>}
+      <p className="lens-keyboard-help" id={`${volumeId}-keyboard`}>Клавіатура: ліворуч — до батьківського, праворуч — до дочірнього; вгору / вниз — сусідні записи. Enter — читати.</p>
       <div className="lens-key" aria-label="Позначення вузлів">
         {(
           ["clinical_event", "specimen", "observation", "finding"] as const
@@ -565,9 +727,10 @@ export function Lens({
           </span>
         ))}
         <span className="lens-key-context">
-          Дрібні точки — згорнутий контекст
+          Дрібні точки — результати на периферії; дослідження зберігають форму
         </span>
         <span className="lens-key-context"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="#eee8f6" stroke="#9280af" /></svg>Коло в центрі — зона збільшення</span>
+        <span className="lens-key-context">Суцільна лінія — зв’язок пакета · пунктир — групування · товщина — навігаційний фокус</span>
       </div>
     </section>
   );

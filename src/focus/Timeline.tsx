@@ -1,5 +1,6 @@
 import { date } from "../model.ts";
 import { compareScopes, type LensModel, type Scope } from "./model.ts";
+import { timelineCounts } from "../features/time.ts";
 
 export function Timeline({
   lm,
@@ -8,6 +9,7 @@ export function Timeline({
   onChange,
   onBaseline,
   onClose,
+  compact = false,
 }: {
   lm: LensModel;
   scope: Scope;
@@ -15,6 +17,7 @@ export function Timeline({
   onChange: (day: string | null) => void;
   onBaseline: (day: string | null) => void;
   onClose?: () => void;
+  compact?: boolean;
 }) {
   const days = lm.days,
     first = days[0],
@@ -31,13 +34,8 @@ export function Timeline({
     difference = baseline
       ? compareScopes(lm, { ...scope, cutoff: baseline }, scope)
       : null;
-  const undated = lm.m.results.filter(
-    (o) =>
-      lm.eligible(o.object_id, scope) &&
-      lm.times.get(o.object_id)?.basis === "unknown",
-  ).length;
+  const basisCounts = timelineCounts(lm, scope);
   const temporalScope = scope.group === "group:temporal";
-  const issued = lm.m.results.filter(o => lm.eligible(o.object_id,scope) && lm.times.get(o.object_id)?.basis === "issued").length;
   const epoch = (s: string) => Date.parse(`${s}T00:00:00Z`),
     min = epoch(first),
     max = epoch(last),
@@ -53,7 +51,7 @@ export function Timeline({
   return (
     <footer
       id="lens-time-controls"
-      className={`timeline ${onClose ? "timeline-expanded" : ""}`}
+      className={`timeline ${onClose ? "timeline-expanded" : ""} ${compact ? "timeline-compact" : ""}`}
       aria-label="Спільний часовий відбір"
     >
       <div className="time-summary">
@@ -61,16 +59,16 @@ export function Timeline({
           <strong>
             {scope.cutoff
               ? `Записи до ${date(scope.cutoff)}`
-              : "Усі дати досліджень"}
+              : "Усі дати записів"}
           </strong>
           <span>
-            {temporalScope ? `${lm.m.temporal.filter(o=>lm.eligible(o.object_id,scope)).length} із ${lm.m.temporal.length} порівнянь · від дати пізнішого запису` : `${counts.visibleResults-undated} датованих + ${undated} без дати · ${counts.visibleResults} із ${counts.results} результатів`}
+            {temporalScope ? `${lm.m.temporal.filter(o=>lm.eligible(o.object_id,scope)).length} із ${lm.m.temporal.length} порівнянь · від дати пізнішого запису` : `${basisCounts.clinical} за клінічною датою · ${basisCounts.issued} за видачею · ${basisCounts.unknown} без дати`}
           </span>
-          {!temporalScope && issued > 0 && <span>{issued} результатів — за датою видачі</span>}
+          {!temporalScope && !compact && <span>{counts.visibleResults} із {counts.results} результатів у відборі</span>}
         </div>
         <div className="time-buttons">
           <button
-            aria-label="Попередня дата дослідження"
+            aria-label="Попередня наявна дата записів"
             onClick={() => jump(-1)}
             disabled={current <= first}
           >
@@ -85,7 +83,7 @@ export function Timeline({
             onChange={(e) => e.target.value && onChange(e.target.value)}
           />
           <button
-            aria-label="Наступна дата дослідження"
+            aria-label="Наступна наявна дата записів"
             onClick={() => jump(1)}
             disabled={current >= last}
           >
@@ -101,12 +99,12 @@ export function Timeline({
             className={baseline ? "active" : ""}
             onClick={() => onBaseline(baseline ? null : current)}
           >
-            {baseline ? "Скасувати порівняння" : "Порівняти з цією датою"}
+            {baseline ? "Скасувати порівняння" : "Зафіксувати цю дату як A"}
           </button>
           {onClose && <button onClick={onClose}>Повернутись до лінзи</button>}
         </div>
       </div>
-      <div className="time-rail">
+      {!compact && <div className="time-rail">
         <div className="time-fill" style={{ width: `${percent(current)}%` }} />
         {days.map((d) => (
           <button
@@ -129,23 +127,25 @@ export function Timeline({
         )}
         <input
           aria-label="Часовий курсор"
+          aria-valuetext={scope.cutoff ? `До ${date(scope.cutoff)} включно` : `Усі дати до ${date(last)}`}
           type="range"
           min={min}
-          max={max || min + 86400000}
+          max={max}
+          disabled={days.length < 2}
           step={86400000}
           value={epoch(current)}
           onChange={(e) =>
             onChange(new Date(+e.target.value).toISOString().slice(0, 10))
           }
         />
-      </div>
-      <p className="time-explanation">
+      </div>}
+      {!compact && <p className="time-explanation">
         {baseline
           ? `Дата A — ${date(baseline)}. Тепер оберіть другу дату B. У таблиці можна зіставити склад записів.`
           : "Оберіть дату: залишаться записи до неї включно. «Усі дати» скасовує цей відбір."}{" "}
         Якщо клінічної дати немає, використано дату видачі з позначкою «видано». Записи без обох дат керуються перемикачем «Без дати».
-      </p>
-      <div className="time-foot">
+      </p>}
+      {!compact && <div className="time-foot">
         <span>{date(first)}</span>
         {difference ? (
           <span className="time-comparison">
@@ -161,7 +161,7 @@ export function Timeline({
           </span>
         )}
         <span>{date(last)}</span>
-      </div>
+      </div>}
     </footer>
   );
 }

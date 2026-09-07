@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
 import {
   date,
@@ -22,9 +22,19 @@ import { TreeTable } from "./TreeTable";
 import { Timeline } from "./Timeline";
 import "./style.css";
 import { FALLBACK_FONT_FAMILY, loadLensTypeface } from "./typography.ts";
+import {RecordInsights} from '../features/RecordInsights';
+import {unitDisplay} from '../features/clinical';
+import {emptyTaskQuery,filterTaskNodes,queryDescription,type TaskQuery} from '../features/query';
+import {TaskFilters} from '../features/TaskFilters';
+import {Places} from '../session/Places';
+import {viewFromURL,writeViewURL,type ViewState} from '../session/state';
+import './workspace-upgrades.css';
+
+const Experiments=lazy(()=>import('../experiments/Experiments'));
 
 const ALL: Scope = { cutoff: null, undated: true, group: null };
-type Mode = "2d" | "table";
+type Mode = "2d" | "table" | "dual" | "regroup" | "lab";
+const readMode=():Mode=>{const m=new URLSearchParams(location.search).get('lens');return ['table','dual','regroup','lab'].includes(m||'')?m as Mode:'2d';};
 function Icon({
   type,
 }: {
@@ -88,7 +98,7 @@ function App() {
         }
       })
       .catch((e) => {
-        if (e.name !== "AbortError") setError(e.message);
+        if (e.name !== "AbortError") setError("Не вдалося відкрити перевірений знімок. Перевірте з’єднання та повторіть спробу. Дані не змінено.");
       });
     return () => ctl.abort();
   }, []);
@@ -105,24 +115,29 @@ function App() {
 }
 function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string }) {
   const lm = useMemo(() => createLensModel(data), [data]);
-  const [mode, setMode] = useState<Mode>(() => {
-    const m = new URLSearchParams(location.search).get("lens");
-    return m === "table" ? m : "2d";
-  });
-  const [selected, setSelected] = useState(lm.root),
+  const initial=useMemo(()=>viewFromURL(location.href,lm),[lm]);
+  const [mode, setMode] = useState<Mode>(readMode);
+  const [selected, setSelected] = useState(initial?.selected||lm.root),
     [history, setHistory] = useState<string[]>([]),
-    [pinned, setPinned] = useState<string | null>(null);
+    [pinned, setPinned] = useState<string | null>(initial?.pinned||null);
   const [centerKey, setCenterKey] = useState(0);
   const [readerOpen, setReaderOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
-  const [navigationId, setNavigationId] = useState(lm.root);
-  const [scope, setScope] = useState<Scope>(ALL),
-    [baselineDay, setBaselineDay] = useState<string | null>(null),
+  const [navigationId, setNavigationId] = useState(initial?.focus||initial?.selected||lm.root);
+  const [cameraTarget,setCameraTarget]=useState(initial?.focus||initial?.selected||lm.root);
+  const [scope, setScope] = useState<Scope>(initial?.scope||ALL),
+    [baselineDay, setBaselineDay] = useState<string | null>(initial?.baseline||null),
     [query, setQuery] = useState(""),
     [sourceId, setSourceId] = useState<string | null>(null);
   const [railTab, setRailTab] = useState<"contents" | "links" | "compare">(
     "contents",
   );
+  const [textScale,setTextScale]=useState(initial?.textScale||1);
+  const [normalized,setNormalized]=useState(initial?.normalized||false);
+  const [showRelations,setShowRelations]=useState(false);
+  const [task,setTask]=useState<TaskQuery>(emptyTaskQuery);
+  const [searchOpen,setSearchOpen]=useState(false);
+  const embedded=new URLSearchParams(location.search).get('embed')==='1';
   const search = useRef<HTMLInputElement>(null),
     rail = useRef<HTMLElement>(null);
   const node = lm.nodes.get(selected)!,
@@ -140,8 +155,10 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
     if (id !== selected) setHistory((h) => [...h.slice(-29), selected]);
     setSelected(id);
     setNavigationId(id);
+    setCameraTarget(id);
     setSourceId(null);
     setQuery("");
+    setSearchOpen(false);
     setRailTab("contents");
   };
   const back = () => {
@@ -150,6 +167,9 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
       setSelected(last);
       setHistory((h) => h.slice(0, -1));
       setSourceId(null);
+      setNavigationId(last);
+      setCameraTarget(last);
+      setCenterKey(k=>k+1);
     }
   };
   const swapMode = (next: Mode) => {
@@ -167,33 +187,19 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
       if (e.key === "Escape") {
         setSourceId(null);
         setQuery("");
+        setSearchOpen(false);
+        setReaderOpen(false);
+        search.current?.focus({preventScroll:true});
       }
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
-  const selectedEligible = lm.eligible(selected, scope),
+  const selectedInB=lm.eligible(selected,scope);
+  const selectedOnlyA=Boolean(mode==='table'&&baseline&&!selectedInB&&lm.eligible(selected,baseline));
+  const selectedEligible = selectedInB || selectedOnlyA,
     visibleChildren = node.children.filter((id) => lm.contextual(id, scope));
-  const searchResults = query.trim()
-    ? lm.order
-        .filter(
-          (n) =>
-            n.object && n.kind !== "patient" && lm.matches(n.id, query),
-        )
-        .sort(
-          (a, b) =>
-            Number(
-              b.title
-                .toLocaleLowerCase("uk-UA")
-                .includes(query.toLocaleLowerCase("uk-UA")),
-            ) -
-            Number(
-              a.title
-                .toLocaleLowerCase("uk-UA")
-                .includes(query.toLocaleLowerCase("uk-UA")),
-            ),
-        )
-    : [];
+  const searchResults=useMemo(()=>filterTaskNodes(lm,ALL,{...task,text:query}),[lm,task,query]);
   const visibleResults = lm.m.results.filter((o) =>
     lm.eligible(o.object_id, scope),
   );
@@ -212,6 +218,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
       onChange={(cutoff) => setScope((s) => ({ ...s, cutoff }))}
       onBaseline={setBaselineDay}
       onClose={timeOpen ? () => setTimeOpen(false) : undefined}
+      compact={!timeOpen}
     />
   );
   useEffect(() => {
@@ -221,14 +228,19 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
     }
   }, [selectedEligible]);
   useEffect(() => {
-    const u = new URL(location.href);
-    if (u.searchParams.get("lens") && u.searchParams.get("lens") !== mode) {
-      u.searchParams.set("lens", mode);
-      window.history.replaceState(null, "", u);
-    }
-  }, [mode]);
+    if(mode==='2d'||mode==='table') window.history.replaceState(null,'',writeViewURL(location.href,{version:1,graph:data.graph_hash,selected,focus:navigationId,pinned,scope,baseline:baselineDay,mode,textScale,normalized}));
+  }, [mode,selected,navigationId,pinned,scope,baselineDay,textScale,normalized,data.graph_hash]);
+  const view:ViewState={version:1,graph:data.graph_hash,selected,focus:navigationId,pinned,scope,baseline:baselineDay,mode:mode==='table'?'table':'2d',textScale,normalized};
+  function restore(v:ViewState){setSelected(v.selected);setNavigationId(v.focus);setCameraTarget(v.focus);setPinned(v.pinned);setScope(v.scope);setBaselineDay(v.baseline);setMode(v.mode);setTextScale(v.textScale);setNormalized(v.normalized);setCenterKey(k=>k+1);setSourceId(null);setSearchOpen(false);}
+  useEffect(()=>{const pop=()=>{const v=viewFromURL(location.href,lm);if(v)restore(v);setMode(readMode());};addEventListener('popstate',pop);return()=>removeEventListener('popstate',pop);},[lm]);
+  const openRecord=(id:string)=>{choose(id);setReaderOpen(true);requestAnimationFrame(()=>rail.current?.focus({preventScroll:true}));};
+  const openSource=(id:string)=>{openRecord(id);const o=lm.nodes.get(id)?.object;setSourceId(o?lm.m.sourceFor(o)[0]?.id||null:null);};
+  if(mode==='lab'||mode==='dual'||mode==='regroup')return <div className={`experiment-app ${embedded?'embedded':''}`} style={{'--lens-font':fontFamily} as CSSProperties}>
+    <Suspense fallback={<p role="status">Відкриваємо експеримент…</p>}><Experiments lm={lm} scope={scope} fontFamily={fontFamily} initialVariant={mode} onExit={()=>swapMode('2d')}/></Suspense>
+  </div>;
   return (
-    <div className="focus-app" data-typeface={fontFamily} style={{"--lens-font":fontFamily} as CSSProperties}>
+    <div className={`focus-app ${embedded?'embedded':''} ${timeOpen?'time-is-open':''}`} data-typeface={fontFamily} style={{"--lens-font":fontFamily} as CSSProperties}>
+      <a className="skip-link" href="#graph-workspace">До карти й результатів</a>
       <header className="focus-header">
         <button
           className="brand"
@@ -244,6 +256,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
         <span className="prototype-tag">
           HematoBoard · експериментальний перегляд
         </span>
+        {!embedded&&<button className="lab-entry" onClick={()=>swapMode('lab')}>Лабораторія варіантів</button>}
       </header>
       <section className="focus-toolbar">
         <nav aria-label="Спосіб перегляду">
@@ -265,21 +278,33 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
             </button>
           ))}
         </nav>
-        <label className="focus-search">
+        <div className="search-anchor"><label className="focus-search">
           <Icon type="search" />
           <input
             ref={search}
             type="search"
             value={query}
+            name="dossier-search"
+            autoComplete="off"
+            onFocus={()=>setSearchOpen(true)}
             onChange={(e) => {
               setQuery(e.target.value);
-              if (e.target.value) setReaderOpen(true);
+              setSearchOpen(true);
             }}
             placeholder="Показник, дослідження або фрагмент джерела"
             aria-label="Пошук у всьому досьє"
           />
           <kbd>⌘ K</kbd>
         </label>
+        {searchOpen&&<section className="search-popover" aria-label="Пошук і прозорий відбір">
+          <div className="search-heading"><h2>Знайти у досьє</h2><button aria-label="Закрити пошук" onClick={()=>setSearchOpen(false)}>×</button></div>
+          <TaskFilters lm={lm} query={{...task,text:query}} onChange={next=>{setTask(next);setQuery(next.text);}} count={searchResults.length}/>
+          <p className="search-count" role="status" aria-live="polite">{searchResults.length} записів · {queryDescription({...task,text:query})}</p>
+          <p className="help">Пошук у всьому пакеті. Поточний часовий відбір не приховує знайдені записи; вони позначені окремо.</p>
+          <div className="search-results-list">{searchResults.map(n=><NodeRow key={n.id} n={n} lm={lm} scope={scope} onSelect={openRecord}/>)}</div>
+          {!searchResults.length&&<p>Нічого не знайдено. Скоротіть запит або скиньте умови.</p>}
+        </section>}
+        </div>
         <button
           className="time-toggle"
           aria-controls="lens-time-controls"
@@ -337,12 +362,23 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
           />
           Без дати <small>{unknown}</small>
         </label>
-        <span className="coverage">
+        <span className="coverage" role="status" aria-live="polite">
           {scope.group==="group:temporal" ? `${lm.m.temporal.filter(o=>lm.eligible(o.object_id,scope)).length} / ${lm.m.temporal.length} порівнянь` : `${visibleResults.length} / ${lm.m.results.length} результатів`}
         </span>
+        <div className="workspace-tools">
+          <Places lm={lm} current={view} onRestore={restore} history={history} onSelect={openRecord}/>
+          <details className="reading-control"><summary>Вигляд</summary><div className="reading-panel">
+            <label>Розмір тексту<select aria-label="Масштаб тексту" value={textScale} onChange={e=>setTextScale(Number(e.target.value))}><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option></select></label>
+            <label><input type="checkbox" checked={normalized} onChange={e=>setNormalized(e.target.checked)}/>Унормований запис одиниць</label>
+            <p>Лише наявна відповідність у пакеті, без перерахунку значень. Оригінал доступний у джерелі.</p>
+            <label><input type="checkbox" checked={showRelations} onChange={e=>setShowRelations(e.target.checked)}/>Структурні зв’язки відкритого вузла</label>
+            <label><input type="checkbox" disabled/>Гіпотези — не підключені до цього пакета</label>
+          </div></details>
+        </div>
       </div>
       {timeOpen && timeControls}
       <main
+        id="graph-workspace"
         className={`focus-workspace ${readerOpen ? "reader-open" : "reader-closed"}`}
       >
         <section className="graph-workspace" aria-label="Граф і фокус">
@@ -376,8 +412,9 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               lm={lm}
               scope={scope}
               baseline={baseline}
+              normalized={normalized}
               selected={selected}
-              onSelect={choose}
+              onSelect={openRecord}
             />
           ) : (
             <Lens
@@ -385,25 +422,18 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
               lm={lm}
               scope={scope}
               centerKey={centerKey}
+              cameraTarget={cameraTarget}
               selected={selected}
               pinned={pinned}
-              onSelect={(id) => {
-                choose(id);
-                setReaderOpen(true);
-              }}
+              textScale={textScale}
+              canonicalUnits={normalized}
+              showRelations={showRelations||railTab==='links'}
+              sourceTrace={Boolean(sourceId)}
+              onReadSource={openSource}
+              onSelect={openRecord}
+              onNavigate={choose}
               onFocusChange={setNavigationId}
-              onRead={(id) => {
-                choose(id);
-                setReaderOpen(true);
-                setRailTab("contents");
-                requestAnimationFrame(() => {
-                  rail.current?.scrollIntoView({
-                    block: "nearest",
-                    behavior: "smooth",
-                  });
-                  rail.current?.focus({ preventScroll: true });
-                });
-              }}
+              onRead={openRecord}
             />
           )}
           <div className="graph-foot">
@@ -432,12 +462,12 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
           tabIndex={-1}
           aria-label="Вибраний об’єкт і повні дані"
         >
+          <div className="mobile-reader-bar"><span>Відкрито: {node.title}</span><button aria-label="Закрити запис" onClick={()=>setReaderOpen(false)}>×</button></div>
           {readerOpen && navigationId !== selected && (
             <div className="reader-context-switch">
-              <span>Читаємо відкритий запис</span>
-              <button onClick={() => choose(navigationId)}>
-                До даних фокуса
-              </button>
+              <span><b>Відкрито:</b> {node.title}<br/><b>У лінзі:</b> {lm.nodes.get(navigationId)?.title}</span>
+              <button onClick={() => openRecord(navigationId)}>Читати центр</button>
+              <button onClick={() => {setNavigationId(selected);setCameraTarget(selected);setCenterKey(k=>k+1);}}>До відкритого</button>
             </div>
           )}
           {pinned && (
@@ -522,34 +552,15 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
             </button>
           </nav>
           <div className="rail-content">
-            {query ? (
-              <>
-                <h3>
-                  Результати пошуку <small>{searchResults.length}</small>
-                </h3>
-                <p className="help">
-                  Пошук у всьому досьє; записи поза часовим відбором позначено.
-                </p>
-                {searchResults.map((n) => (
-                  <NodeRow
-                    key={n.id}
-                    n={n}
-                    lm={lm}
-                    scope={scope}
-                    onSelect={choose}
-                  />
-                ))}
-                {!searchResults.length && (
-                  <p>Нічого не знайдено. Спробуйте коротшу назву.</p>
-                )}
-              </>
-            ) : sourceId && selectedEligible ? (
+            {selectedOnlyA&&<p className="comparison-reader-note" role="status">Запис тільки у A · {date(baselineDay)}. Дані та джерело відкриті для зіставлення; відбір B не змінено.</p>}
+            {sourceId && selectedEligible ? (
               <>
                 <button className="back-text" onClick={() => setSourceId(null)}>
                   <Icon type="back" />
                   До об’єкта
                 </button>
                 <h3>Точний текст джерела</h3>
+                <nav className="source-path" aria-label="Шлях до джерела">{lm.ancestors(selected).filter(n=>n.object).map(n=><button key={n.id} onClick={()=>openRecord(n.id)}>{n.title}</button>)}</nav>
                 {data.sources
                   .filter((s) => s.id === sourceId)
                   .map((s) => (
@@ -558,7 +569,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                         Сторінка {s.derived_pdf_page ?? "не зазначена"} · запис{" "}
                         {s.source_order}
                       </p>
-                      <blockquote>{s.literal}</blockquote>
+                      <blockquote><SourceLiteral literal={s.literal} target={node.object?value(node.object):''}/></blockquote>
                       <details>
                         <summary>Адреса джерела</summary>
                         <code>{s.id}</code>
@@ -596,10 +607,12 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
                   <ObjectDetail
                     n={node}
                     lm={lm}
+                    normalized={normalized}
                     onSource={setSourceId}
                     onSelect={choose}
                   />
                 )}
+                {node.object&&selectedEligible&&<RecordInsights lm={lm} node={node} scope={selectedOnlyA?baseline!:scope} normalized={normalized} onSelect={openRecord}/>}
                 {node.kind === "group" && (
                   <p className="help">
                     {preview(lm, node, scope).content}. Вибір нижче пересуває цю
@@ -731,11 +744,13 @@ function ObjectDetail({
   lm,
   onSource,
   onSelect,
+  normalized=false,
 }: {
   n: LensNode;
   lm: LensModel;
   onSource: (id: string) => void;
   onSelect: (id: string) => void;
+  normalized?: boolean;
 }) {
   const o = n.object!,
     t = lm.times.get(n.id)!,
@@ -770,7 +785,7 @@ function ObjectDetail({
       {n.kind === "observation" && (
         <div className="result-value">
           {value(o)}
-          <span>{o.payload.source_unit || "одиницю не зазначено"}</span>
+          <span>{unitDisplay(o,normalized) || "одиницю не зазначено"}</span>
         </div>
       )}
       {n.kind === "finding" && <p className="finding-full">{n.title}</p>}
@@ -947,11 +962,16 @@ function Comparison({
         </>
       ) : (
         <p className="help">
-          Виберіть дату внизу, натисніть «Закріпити дату A» та перемістіть
-          курсор до B.
+          Відкрийте «Час», виберіть дату й натисніть «Зафіксувати цю дату як A».
+          Потім виберіть дату B. Таблиця покаже записи обох відборів.
         </p>
       )}
     </>
   );
+}
+function SourceLiteral({literal,target}:{literal:string;target:string}){
+  // Mark only an exact literal match; no rewritten or generated source text.
+  const at=target&&target!=='—'?literal.indexOf(target):-1;
+  return at<0?<>{literal}</>:<>{literal.slice(0,at)}<mark>{literal.slice(at,at+target.length)}</mark>{literal.slice(at+target.length)}</>;
 }
 createRoot(document.getElementById("root")!).render(<App />);

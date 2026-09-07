@@ -1,5 +1,14 @@
 import type { LensNode } from "./model.ts";
 
+/** Study marks retain their source category at the perimeter of the lens. */
+export function StudyMark({ eventKind, r, color = "#fff" }: { eventKind?: string; r: number; color?: string }) {
+  const a = r * 0.48;
+  const common = { fill: "none", stroke: color, strokeWidth: Math.max(0.8, r * 0.12), strokeLinecap: "round" as const };
+  if (eventKind === "imaging_study") return <g {...common}><circle r={a} /><path d={`M${-a * 1.4} 0h${a * 2.8}M0 ${-a * 1.4}v${a * 2.8}`} /></g>;
+  if (eventKind === "pathology_procedure") return <g {...common}><circle cx={-a * 0.45} cy={-a * 0.3} r={a * 0.62} /><circle cx={a * 0.55} cy={a * 0.4} r={a * 0.55} /></g>;
+  return <path d={`M${-a} ${-a}h${a * 2}M${-a} 0h${a * 2}M${-a} ${a}h${a * 1.4}`} {...common} />;
+}
+
 export function NodeShape({
   kind,
   r,
@@ -50,9 +59,11 @@ export function NodeShape({
 export function NodeGlyph({
   kind,
   color = "currentColor",
+  eventKind,
 }: {
   kind: LensNode["kind"];
   color?: string;
+  eventKind?: string;
 }) {
   return (
     <svg
@@ -72,6 +83,7 @@ export function NodeGlyph({
       {(kind === "patient" || kind === "group") && (
         <circle r="2.5" fill={color} />
       )}
+      {kind === "clinical_event" && eventKind && <StudyMark eventKind={eventKind} r={6.5} />}
     </svg>
   );
 }

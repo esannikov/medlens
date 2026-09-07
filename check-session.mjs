@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createLensModel} from './src/focus/model.ts';
+import {validateView,writeViewURL,viewFromURL,parseBookmarks} from './src/session/state.ts';
+const lm=createLensModel(JSON.parse(fs.readFileSync('public/data/case024.json','utf8')));
+const v={version:1,graph:lm.data.graph_hash,selected:lm.root,focus:lm.groups[0],pinned:null,scope:{cutoff:'2026-05-22',undated:true,group:null},baseline:'2026-08-24',mode:'2d',textScale:1.15,normalized:true};
+assert.deepEqual(viewFromURL(writeViewURL('https://example.org/medlens/?q=private',v),lm),v);
+assert(!writeViewURL('https://example.org/?q=private',v).includes('private'));
+assert.equal(validateView({...v,graph:'wrong-revision'},lm),null);
+assert.equal(validateView({...v,selected:'missing'},lm),null);
+assert.equal(validateView({...v,scope:{...v.scope,cutoff:'2026-02-31'}},lm),null);
+assert.deepEqual(parseBookmarks('broken',lm),[]);
+assert.equal(parseBookmarks(JSON.stringify([{savedAt:'now',view:v},{savedAt:'then',view:{...v,graph:'old'}}]),lm).length,1);
+console.log('Session PASS: revision-bound IDs, calendar validation, URL roundtrip, no query persistence');

@@ -2,6 +2,7 @@ node_modules/
 dist/
 output/
 .playwright-cli/
+.impeccable/
 .DS_Store
 .env*
 *.log

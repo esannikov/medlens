@@ -1,0 +1,257 @@
+.lens-upgraded .lens-orientation {
+  height: auto;
+  min-height: 72px;
+  align-items: flex-start;
+}
+.lens-upgraded .focus-caption-text strong {
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+.lens-upgraded .lens-orientation > button {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.lens-compass {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px 4px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #a89ab8 #faf8fd;
+}
+.lens-compass button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 5px 9px;
+  color: #554761;
+  font-size: 11px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+.lens-compass button[aria-pressed="true"] {
+  color: #573b80;
+  background: #eee8f6;
+  box-shadow: inset 0 -2px #6750a4;
+}
+.lens-upgraded button:disabled {
+  color: #8d8495;
+  opacity: 0.65;
+  cursor: default;
+}
+.lens-compass button:hover:not(:disabled),
+.lens-coverage button:hover,
+.lens-relations button:hover {
+  background: #eee8f6;
+}
+.lens-upgraded button:focus-visible,
+.lens-upgraded summary:focus-visible,
+.lens-upgraded .lens-svg:focus-visible {
+  outline: 2px solid #6750a4;
+  outline-offset: -2px;
+}
+.lens-upgraded .lens {
+  min-height: 250px;
+}
+.lens-upgraded .lens-zoom {
+  align-items: center;
+  max-width: calc(100% - 20px);
+  left: 10px;
+  gap: 3px;
+  bottom: 6px;
+}
+.lens-upgraded .lens-zoom button,
+.lens-upgraded .lens-zoom select {
+  min-height: 44px;
+}
+.lens-upgraded .lens-zoom button {
+  min-width: 44px;
+  padding: 4px 7px;
+}
+.lens-direction-controls {
+  display: flex;
+  gap: 2px;
+  margin-right: 7px;
+}
+.lens-direction-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lens-upgraded .lens-peek {
+  bottom: 60px;
+}
+.lens-coverage,
+.lens-relations {
+  flex-shrink: 0;
+  border-top: 1px solid #e2dbe9;
+  background: #fffbfe;
+  font-size: 11px;
+  color: #554761;
+}
+.lens-coverage-summary,
+.lens-relations-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 2px 18px;
+}
+.lens-coverage-summary strong {
+  color: #352d40;
+  font-variant-numeric: tabular-nums;
+}
+.lens-coverage button,
+.lens-relations button {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #573b80;
+  padding: 7px 5px;
+  font: inherit;
+  text-align: left;
+}
+.lens-coverage-content,
+.lens-relation-content {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #a89ab8 #fffbfe;
+  padding: 0 18px 8px;
+}
+.lens-coverage-content p,
+.lens-relation-content p {
+  margin: 6px 0 10px;
+  line-height: 1.5;
+  max-width: 72ch;
+}
+.lens-coverage-content ul,
+.lens-relation-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lens-coverage-content li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-top: 1px solid #ebe5f0;
+}
+.lens-coverage-content li > button:first-child {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  color: #352d40;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.lens-coverage-content li > button:last-child {
+  flex-shrink: 0;
+}
+.lens-coverage-content li > button > span:nth-child(2),
+.lens-coverage-content small {
+  color: #655671;
+}
+.lens-relation-content li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid #ebe5f0;
+  overflow-wrap: anywhere;
+}
+.lens-relation-content code {
+  font-size: 10px;
+  color: #655671;
+}
+.lens-relation-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 10px;
+  padding: 0 18px 9px;
+  margin: 0;
+}
+.lens-keyboard-help {
+  margin: 0;
+  padding: 4px 18px;
+  color: #655671;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.lens-upgraded .lens-key {
+  font-size: 10px;
+  padding: 4px 12px 7px;
+  gap: 4px 12px;
+}
+.lens-upgraded ::selection {
+  background: #e0d3ef;
+  color: #352d40;
+}
+@media (max-width: 600px) {
+  .lens-upgraded .lens-orientation {
+    padding: 7px 12px;
+    gap: 8px;
+  }
+  .lens-upgraded .lens-orientation button {
+    max-width: 90px;
+    white-space: normal;
+  }
+  .lens-upgraded .focus-caption-text > span {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .lens-compass {
+    padding-inline: 8px;
+  }
+  .lens-compass button {
+    font-size: 10px;
+    gap: 4px;
+    padding-inline: 7px;
+  }
+  .lens-upgraded .lens-zoom {
+    gap: 2px;
+  }
+  .lens-upgraded .lens-zoom select {
+    max-width: 110px;
+    font-size: 10px;
+  }
+  .lens-direction-controls {
+    margin-right: 3px;
+  }
+  .lens-upgraded .lens-zoom > button:nth-of-type(2) {
+    font-size: 10px;
+    max-width: 62px;
+    white-space: normal;
+  }
+  .lens-upgraded .lens-zoom select {
+    position: absolute;
+    left: 0;
+    bottom: 49px;
+  }
+  .lens-coverage-summary,
+  .lens-relations-summary {
+    padding-inline: 12px;
+  }
+  .lens-coverage-content,
+  .lens-relation-content {
+    padding-inline: 12px;
+    max-height: 220px;
+  }
+  .lens-keyboard-help {
+    display: none;
+  }
+  .lens-upgraded .lens-key .lens-key-context {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+}
