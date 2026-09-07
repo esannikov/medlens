@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-07T09:01:03.119Z",
+  "title": "Design System: MedLens",
+  "extensions": {
+    "colorMeta": {
+      "purple": {
+        "role": "primary",
+        "displayName": "Фіолетовий",
+        "tonalRamp": [
+          "oklch(15.00% 0.1305 293.71)",
+          "oklch(26.43% 0.1305 293.71)",
+          "oklch(37.86% 0.1305 293.71)",
+          "oklch(49.29% 0.1305 293.71)",
+          "oklch(60.71% 0.1305 293.71)",
+          "oklch(72.14% 0.1305 293.71)",
+          "oklch(83.57% 0.1305 293.71)",
+          "oklch(95.00% 0.1305 293.71)"
+        ]
+      },
+      "pathology": {
+        "role": "secondary",
+        "displayName": "Малиновий: морфологія",
+        "tonalRamp": [
+          "oklch(15.00% 0.1667 351.02)",
+          "oklch(26.43% 0.1667 351.02)",
+          "oklch(37.86% 0.1667 351.02)",
+          "oklch(49.29% 0.1667 351.02)",
+          "oklch(60.71% 0.1667 351.02)",
+          "oklch(72.14% 0.1667 351.02)",
+          "oklch(83.57% 0.1667 351.02)",
+          "oklch(95.00% 0.1667 351.02)"
+        ]
+      },
+      "imaging": {
+        "role": "secondary",
+        "displayName": "Синій: візуалізація",
+        "tonalRamp": [
+          "oklch(15.00% 0.1709 260.61)",
+          "oklch(26.43% 0.1709 260.61)",
+          "oklch(37.86% 0.1709 260.61)",
+          "oklch(49.29% 0.1709 260.61)",
+          "oklch(60.71% 0.1709 260.61)",
+          "oklch(72.14% 0.1709 260.61)",
+          "oklch(83.57% 0.1709 260.61)",
+          "oklch(95.00% 0.1709 260.61)"
+        ]
+      },
+      "laboratory": {
+        "role": "secondary",
+        "displayName": "Зелений: лабораторія",
+        "tonalRamp": [
+          "oklch(15.00% 0.0947 181.48)",
+          "oklch(26.43% 0.0947 181.48)",
+          "oklch(37.86% 0.0947 181.48)",
+          "oklch(49.29% 0.0947 181.48)",
+          "oklch(60.71% 0.0947 181.48)",
+          "oklch(72.14% 0.0947 181.48)",
+          "oklch(83.57% 0.0947 181.48)",
+          "oklch(95.00% 0.0947 181.48)"
+        ]
+      },
+      "temporal": {
+        "role": "secondary",
+        "displayName": "Охристий: часові зв’язки",
+        "tonalRamp": [
+          "oklch(15.00% 0.1154 68.12)",
+          "oklch(26.43% 0.1154 68.12)",
+          "oklch(37.86% 0.1154 68.12)",
+          "oklch(49.29% 0.1154 68.12)",
+          "oklch(60.71% 0.1154 68.12)",
+          "oklch(72.14% 0.1154 68.12)",
+          "oklch(83.57% 0.1154 68.12)",
+          "oklch(95.00% 0.1154 68.12)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Темне чорнило",
+        "tonalRamp": [
+          "oklch(15.00% 0.0258 301.18)",
+          "oklch(26.43% 0.0258 301.18)",
+          "oklch(37.86% 0.0258 301.18)",
+          "oklch(49.29% 0.0258 301.18)",
+          "oklch(60.71% 0.0258 301.18)",
+          "oklch(72.14% 0.0258 301.18)",
+          "oklch(83.57% 0.0258 301.18)",
+          "oklch(95.00% 0.0258 301.18)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Приглушений текст",
+        "tonalRamp": [
+          "oklch(15.00% 0.0269 310.48)",
+          "oklch(26.43% 0.0269 310.48)",
+          "oklch(37.86% 0.0269 310.48)",
+          "oklch(49.29% 0.0269 310.48)",
+          "oklch(60.71% 0.0269 310.48)",
+          "oklch(72.14% 0.0269 310.48)",
+          "oklch(83.57% 0.0269 310.48)",
+          "oklch(95.00% 0.0269 310.48)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Папір",
+        "tonalRamp": [
+          "oklch(15.00% 0.0058 333.98)",
+          "oklch(26.43% 0.0058 333.98)",
+          "oklch(37.86% 0.0058 333.98)",
+          "oklch(49.29% 0.0058 333.98)",
+          "oklch(60.71% 0.0058 333.98)",
+          "oklch(72.14% 0.0058 333.98)",
+          "oklch(83.57% 0.0058 333.98)",
+          "oklch(95.00% 0.0058 333.98)"
+        ]
+      },
+      "backdrop": {
+        "role": "neutral",
+        "displayName": "Тло",
+        "tonalRamp": [
+          "oklch(15.00% 0.0069 304.24)",
+          "oklch(26.43% 0.0069 304.24)",
+          "oklch(37.86% 0.0069 304.24)",
+          "oklch(49.29% 0.0069 304.24)",
+          "oklch(60.71% 0.0069 304.24)",
+          "oklch(72.14% 0.0069 304.24)",
+          "oklch(83.57% 0.0069 304.24)",
+          "oklch(95.00% 0.0069 304.24)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Розділювач",
+        "tonalRamp": [
+          "oklch(15.00% 0.0173 308.25)",
+          "oklch(26.43% 0.0173 308.25)",
+          "oklch(37.86% 0.0173 308.25)",
+          "oklch(49.29% 0.0173 308.25)",
+          "oklch(60.71% 0.0173 308.25)",
+          "oklch(72.14% 0.0173 308.25)",
+          "oklch(83.57% 0.0173 308.25)",
+          "oklch(95.00% 0.0173 308.25)"
+        ]
+      },
+      "soft": {
+        "role": "neutral",
+        "displayName": "М’який фіолетовий",
+        "tonalRamp": [
+          "oklch(15.00% 0.0197 305.26)",
+          "oklch(26.43% 0.0197 305.26)",
+          "oklch(37.86% 0.0197 305.26)",
+          "oklch(49.29% 0.0197 305.26)",
+          "oklch(60.71% 0.0197 305.26)",
+          "oklch(72.14% 0.0197 305.26)",
+          "oklch(83.57% 0.0197 305.26)",
+          "oklch(95.00% 0.0197 305.26)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Білий",
+        "tonalRamp": [
+          "oklch(15.00% 0.0000 0.00)",
+          "oklch(26.43% 0.0000 0.00)",
+          "oklch(37.86% 0.0000 0.00)",
+          "oklch(49.29% 0.0000 0.00)",
+          "oklch(60.71% 0.0000 0.00)",
+          "oklch(72.14% 0.0000 0.00)",
+          "oklch(83.57% 0.0000 0.00)",
+          "oklch(95.00% 0.0000 0.00)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Назва запису",
+        "purpose": "Операційний заголовок reader; font-family успадкований від інтерфейсу."
+      },
+      "body": {
+        "displayName": "Текст панелі",
+        "purpose": "Пояснення та звичайний текст читання."
+      },
+      "body-literal": {
+        "displayName": "Дослівна знахідка",
+        "purpose": "Розгорнутий текст із збереженими перенесеннями рядків."
+      },
+      "label": {
+        "displayName": "Контрол",
+        "purpose": "Текст звичайної кнопки."
+      },
+      "lens": {
+        "displayName": "Підпис лінзи",
+        "purpose": "Розмір визначають відстань, вимірювання та масштаб тексту; frontmatter не задає фіксований розмір."
+      },
+      "value": {
+        "displayName": "Числове значення",
+        "purpose": "Число у reader; одиниця та дата мають окреме оформлення."
+      }
+    },
+    "shadows": [
+      {
+        "name": "search",
+        "value": "0 12px 32px #302b391c",
+        "purpose": "Панель пошуку під полем."
+      },
+      {
+        "name": "tools",
+        "value": "0 10px 28px #302b391a",
+        "purpose": "Налаштування та місця."
+      },
+      {
+        "name": "coverage",
+        "value": "0 -8px 24px #302b391a",
+        "purpose": "Перелік над смугою покриття."
+      },
+      {
+        "name": "mobile-reader",
+        "value": "0 -12px 30px #302b391c",
+        "purpose": "Мобільна нижня панель читання."
+      }
+    ],
+    "motion": [
+      {
+        "name": "focus-navigation",
+        "value": "420ms; 1 - (1 - t)^4",
+        "purpose": "Наближення обраного вузла; reduced-motion одразу встановлює ціль."
+      },
+      {
+        "name": "focus-tint",
+        "value": "stop-color 220ms ease-out",
+        "purpose": "Зміна відтінку категорії у фокусі."
+      },
+      {
+        "name": "connections",
+        "value": "stroke-width 140ms ease-out, opacity 160ms ease-out",
+        "purpose": "Навігаційний акцент ліній."
+      },
+      {
+        "name": "glint",
+        "value": "650ms cubic-bezier(0.16,1,0.3,1)",
+        "purpose": "Короткий оптичний відблиск; вимкнений у reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "lens-compact",
+        "value": "600px"
+      },
+      {
+        "name": "mobile",
+        "value": "760px"
+      },
+      {
+        "name": "toolbar-wrap",
+        "value": "1050px"
+      },
+      {
+        "name": "regroup-stack",
+        "value": "1100px"
+      },
+      {
+        "name": "reader-narrow",
+        "value": "1150px"
+      },
+      {
+        "name": "reader-wide",
+        "value": "1600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Звичайна кнопка",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Світлий контурний контрол із наведенням і видимим клавіатурним фокусом.",
+      "html": "<button class=\"ds-button\" type=\"button\">Відкрити запис</button>",
+      "css": ".ds-button{font:400 12px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;border:1px solid var(--line,#e6e0ec);background:var(--paper,#fffbfe);color:var(--ink,#302b39);min-height:38px;border-radius:7px;padding:7px 11px;cursor:pointer}.ds-button:hover{background:#f1ebf8}.ds-button[aria-pressed=\"true\"]{background:var(--soft,#eee8f6);color:#5d3f88;border-color:#d7cbe6}.ds-button:disabled{opacity:.43;cursor:default}.ds-button:focus-visible{outline:3px solid #9a80b8;outline-offset:2px}"
+    },
+    {
+      "name": "Основні режими",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "Фіолетова активна вкладка та прозора сусідня вкладка.",
+      "html": "<nav class=\"ds-navigation\" aria-label=\"Режим перегляду\"><button type=\"button\" aria-pressed=\"true\">Лінза 2D</button><button type=\"button\" aria-pressed=\"false\">Граф + таблиця</button></nav>",
+      "css": ".ds-navigation{display:flex;gap:5px;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-navigation button{font:400 13px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:40px;padding:8px 13px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--ink,#302b39);cursor:pointer}.ds-navigation button:hover{background:#f1ebf8}.ds-navigation button[aria-pressed=\"true\"]{background:var(--purple,#6750a4);color:#fff}.ds-navigation button:focus-visible{outline:3px solid #9a80b8;outline-offset:2px}"
+    },
+    {
+      "name": "Текстова дія",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Дія читання поруч із поточним фокусом.",
+      "html": "<button class=\"ds-text-action\" type=\"button\">Відкрити вміст</button>",
+      "css": ".ds-text-action{font:400 11px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--purple,#6750a4);border:0;border-radius:0;background:transparent;padding:4px;min-height:44px;cursor:pointer}.ds-text-action:hover{background:#f1ebf8}.ds-text-action:focus-visible{outline:2px solid #6750a4;outline-offset:-2px}"
+    },
+    {
+      "name": "Пошук",
+      "kind": "input",
+      "refersTo": "search",
+      "description": "Поле з SVG-позначкою пошуку; результати відкриваються у прив’язаній панелі.",
+      "html": "<label class=\"ds-search\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><circle cx=\"10\" cy=\"10\" r=\"6\"></circle><path d=\"m15 15 5 5\"></path></svg><input type=\"search\" aria-label=\"Пошук записів\" placeholder=\"Показник, дослідження або фрагмент джерела\"></label>",
+      "css": ".ds-search{position:relative;display:flex;align-items:center;max-width:700px;width:100%;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-search svg{position:absolute;left:12px;color:#817589;pointer-events:none}.ds-search input{font:400 14px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-width:0;width:100%;height:41px;border:1px solid var(--line,#e6e0ec);border-radius:8px;padding:9px 55px 9px 39px;background:var(--paper,#fffbfe);color:var(--ink,#302b39);caret-color:var(--purple,#6750a4)}.ds-search input::placeholder{color:#817589}.ds-search input:focus-visible{outline:3px solid #9a80b8;outline-offset:2px}"
+    },
+    {
+      "name": "Категорійний фільтр",
+      "kind": "chip",
+      "description": "Колір вказує категорію, текст називає її; вибір додає м’яке тло.",
+      "html": "<button class=\"ds-category\" type=\"button\" aria-pressed=\"true\"><i aria-hidden=\"true\"></i>Візуалізація</button>",
+      "css": ".ds-category{display:inline-flex;align-items:center;gap:6px;font:400 11px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:29px;padding:4px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--ink,#302b39);cursor:pointer}.ds-category i{width:6px;height:6px;border-radius:50%;background:#245FC5;flex-shrink:0}.ds-category[aria-pressed=\"true\"]{background:#eae4f2}.ds-category:hover{background:#f1ebf8}.ds-category:focus-visible{outline:3px solid #9a80b8;outline-offset:2px}"
+    },
+    {
+      "name": "Рядок джерела",
+      "kind": "button",
+      "refersTo": "source-row",
+      "description": "Повноширинна дія з тонким нижнім розділювачем та SVG-позначкою.",
+      "html": "<button class=\"ds-source-row\" type=\"button\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"15\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M6 3h12v18H6zM9 7h6M9 11h6M9 15h4\"></path></svg><span>Дослівне джерело</span></button>",
+      "css": ".ds-source-row{font:400 11px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:7px;width:100%;min-height:44px;padding:10px 0;text-align:left;border:0;border-bottom:1px solid var(--line,#e6e0ec);border-radius:0;background:transparent;color:var(--purple,#6750a4);cursor:pointer}.ds-source-row span{flex:1}.ds-source-row:hover{background:#f1ebf8}.ds-source-row:focus-visible{outline:3px solid #9a80b8;outline-offset:2px}"
+    },
+    {
+      "name": "Панель пошуку",
+      "kind": "card",
+      "refersTo": "popover",
+      "description": "Обмежена висотою плаваюча панель, зразок без даних пацієнта.",
+      "html": "<section class=\"ds-popover\" aria-label=\"Результати пошуку\"><div class=\"ds-popover-heading\"><h2>Результати пошуку</h2><button type=\"button\" aria-label=\"Закрити пошук\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"m6 6 12 12M18 6 6 18\"></path></svg></button></div><p>Нічого не знайдено. Скоротіть запит або скиньте умови.</p></section>",
+      "css": ".ds-popover{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:var(--paper,#fffbfe);color:var(--ink,#302b39);border:1px solid var(--line,#e6e0ec);border-radius:12px;padding:16px;max-width:calc(100vw - 32px);max-height:min(650px,calc(100dvh - 130px));overflow:auto;overscroll-behavior:contain;box-shadow:0 12px 32px #302b391c}.ds-popover-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-popover h2{font-size:17px;margin:0}.ds-popover p{font-size:12px;line-height:1.65;color:var(--muted,#716878)}.ds-popover button{display:grid;place-items:center;min-width:36px;min-height:36px;padding:7px 11px;border:1px solid var(--line,#e6e0ec);border-radius:7px;background:var(--paper,#fffbfe);color:var(--ink,#302b39);cursor:pointer}.ds-popover button:hover{background:#f1ebf8}.ds-popover button:focus-visible{outline:3px solid #9a80b8;outline-offset:2px}"
+    },
+    {
+      "name": "Запис у переліку покриття",
+      "kind": "custom",
+      "description": "Вільний текст у рядку з прямим доступом до запису та його джерела.",
+      "html": "<ul class=\"ds-coverage\"><li><button type=\"button\"><span>Назва запису з пакета</span><span>Підстава дати та контекст запису</span></button><button type=\"button\">Джерело</button></li></ul>",
+      "css": ".ds-coverage{font:400 11px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;list-style:none;margin:0;padding:0;background:var(--paper,#fffbfe);color:#554761}.ds-coverage li{display:flex;align-items:flex-start;gap:8px;border-top:1px solid #ebe5f0}.ds-coverage button{font:inherit;min-height:44px;padding:7px 5px;border:0;background:transparent;color:#573b80;text-align:left;cursor:pointer}.ds-coverage li>button:first-child{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px;color:#352d40;line-height:1.45;overflow-wrap:anywhere}.ds-coverage li>button:last-child{flex-shrink:0}.ds-coverage span+span{color:#655671}.ds-coverage button:hover{background:#eee8f6}.ds-coverage button:focus-visible{outline:2px solid #6750a4;outline-offset:-2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Лінза досьє",
+    "overview": "Світле робоче поле зберігає загальне розміщення досьє, поки локальний фокус\nнаближає вузли та їхні підписи. Візуальний характер задають Iosevka,\nвільний текст біля вузлів, тонкі кольорові зв’язки й стримана оптична глибина.\nЧитання повного запису відбувається в окремій панелі; навігаційний центр\nі відкритий запис мають власні видимі позначення.\n\nЦей документ фіксує реалізовану систему основної лінзи та споріднених\nекспериментальних поверхонь. Палітра й форми походять із\n[моделі лінзи](src/focus/model.ts) та [знаків вузлів](src/focus/NodeGlyph.tsx).\nКомпозиція спирається на [основні стилі](src/focus/style.css),\n[стилі лінзи](src/focus/lens-upgrades.css), чинні перевизначення\n[робочої області](src/focus/workspace-upgrades.css) і\n[стилі експериментів](src/experiments/experiments.css).\nПогоджені продуктові рішення містяться в [PRODUCT.md](PRODUCT.md);\nреалізаційний план — у [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).",
+    "keyCharacteristics": [
+      "Двовимірне поле з локальним збільшенням і видимою периферією.",
+      "Вільні підписи та моноширинні значення.",
+      "Тип запису читається через форму, колір і текст.",
+      "Приховані підписи мають явний перелік доступних результатів."
+    ],
+    "rules": [
+      {
+        "name": "The Typed Color Rule",
+        "body": "Колір категорії зберігає походження запису;\nфіолетовий вибір показує стан інтерфейсу. Жоден із цих кольорів не кодує\nклінічну тяжкість, достовірність або рекомендацію.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured Label Rule",
+        "body": "Підписи вимірюються у фактично завантаженому шрифті.\nМасштаб тексту (100%, 115%, 130%) змінюється незалежно від масштабу графа;\nповний текст залишається доступним у панелі читання.",
+        "section": "typography"
+      },
+      {
+        "name": "The Modest Optics Rule",
+        "body": "Градієнти та відблиск належать лінзі;\nтіні позначають накладені панелі. Вільні підписи не отримують декоративних карток.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** зберігати 2D-лінзу, Iosevka, вільні підписи й тонку ієрархію зв’язків.",
+      "**Do** розрізняти категорію, навігаційний фокус і відкритий запис через текст і стан.",
+      "**Do** давати явний доступ до результатів, підписи яких не помістилися у фокусі.",
+      "**Do** зберігати дослівний текст, підставу дати, одиницю та шлях до джерела під час читання.",
+      "**Do** залишати експерименти окремими й видимо називати їх експериментами.",
+      "**Do** поважати масштаб тексту, клавіатурну навігацію та reduced-motion."
+    ],
+    "donts": [
+      "**Don't** перетворювати підписи графа на ряд декоративних карток.",
+      "**Don't** кодувати клінічну тяжкість, довіру чи рішення товщиною лінії або кольором категорії.",
+      "**Don't** називати текстову згадку анатомічною локалізацією або парні лінзи спільною біфокальною математикою.",
+      "**Don't** додавати вигадані факти пацієнта, числові приклади чи клінічні твердження до компонентних зразків.",
+      "**Don't** переносити щільний допоміжний текст або обрізані навігаційні назви в повний текст reader."
+    ]
+  }
+}
