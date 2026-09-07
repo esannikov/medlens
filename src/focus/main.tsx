@@ -16,6 +16,7 @@ import {
   type Scope,
 } from "./model.ts";
 import { Lens } from "./Lens";
+import { Breadcrumbs } from './Breadcrumbs';
 import { NodeGlyph } from "./NodeGlyph";
 import { nodeKinds, preview } from "./layout.ts";
 import { TreeTable } from "./TreeTable";
@@ -299,31 +300,7 @@ function Workspace({ data, fontFamily }: { data: Snapshot; fontFamily: string })
         className={`focus-workspace ${readerOpen ? "reader-open" : "reader-closed"}`}
       >
         <section className="graph-workspace" aria-label="Граф і фокус">
-          <div className="focus-breadcrumb">
-            <button
-              aria-label="Назад до попереднього фокуса"
-              disabled={!history.length}
-              onClick={back}
-            >
-              <Icon type="back" />
-            </button>
-            <div>
-              {lm
-                .ancestors(mode === "table" ? selected : navigationId)
-                .map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => choose(n.id)}
-                    title={n.title}
-                  >
-                    {n.title}
-                  </button>
-                ))}
-            </div>
-            <button className="reset-focus" onClick={() => choose(lm.root)}>
-              Весь граф
-            </button>
-          </div>
+          <Breadcrumbs path={lm.ancestors(displayId)} onSelect={choose} onBack={back} canBack={history.length>0}/>
           {mode === "table" ? (
             <TreeTable
               lm={lm}

@@ -27,7 +27,17 @@
 .quiet-app .lens-svg { width: 100%; height: 100%; display: block; }
 .quiet-app .focus-breadcrumb { position: absolute; top: 8px; left: 14px; right: auto; max-width: calc(100% - 28px); height: 34px; min-height: 0; padding: 0; z-index: 6; border: 0; background: transparent; gap: 8px; }
 .quiet-app .focus-breadcrumb button { font-size: 12px; min-height: 30px; background: transparent; border-color: transparent; }
-.quiet-app .focus-breadcrumb > div { overflow-x: auto; }
+.quiet-app .breadcrumb-chips { display: flex; align-items: center; gap: 7px; list-style: none; margin: 0; padding: 3px; overflow-x: auto; scrollbar-width: none; min-width: 0; max-width: 100%; }
+.quiet-app .breadcrumb-chips::-webkit-scrollbar { display: none; }
+.quiet-app .breadcrumb-chips li { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.quiet-app .breadcrumb-chips .crumb-chip { display: inline-flex; align-items: center; min-height: 30px; max-width: 340px; padding: 5px 11px; border-radius: 999px; border: 1px solid color-mix(in srgb,var(--crumb-color) 23%,var(--paper)); background: color-mix(in srgb,var(--crumb-color) 9%,var(--paper)); color: color-mix(in srgb,var(--crumb-color) 85%,#000); font-weight: 500; white-space: nowrap; }
+.quiet-app .crumb-chip span { overflow: hidden; text-overflow: ellipsis; }
+.quiet-app .breadcrumb-chips .crumb-chip[aria-current] { background: var(--crumb-color); border-color: var(--crumb-color); color: #fff; font-weight: 600; }
+.quiet-app .breadcrumb-chips .crumb-chip:hover { background: color-mix(in srgb,var(--crumb-color) 15%,var(--paper)); }
+.quiet-app .breadcrumb-chips .crumb-chip[aria-current]:hover { background: color-mix(in srgb,var(--crumb-color) 88%,#000); }
+.quiet-app .breadcrumb-chips .crumb-chip:focus-visible { outline: 2px solid var(--crumb-color); outline-offset: 1px; }
+.quiet-app .crumb-separator { color: var(--crumb-color); opacity: .5; font-size: 13px; }
+@media (min-width: 701px) { .quiet-app .reader-open .focus-breadcrumb { max-width: calc(100% - 400px); } }
 .quiet-app .reset-focus { display: none; }
 .quiet-app .lens-date-context { position: absolute; top: 45px; left: 24px; z-index: 4; font: 12px var(--lens-font); color: #665770; max-width: calc(100% - 48px); pointer-events: none; }
 .quiet-app .lens-zoom { left: 18px; bottom: 18px; z-index: 7; gap: 4px; }
@@ -92,6 +102,9 @@
   .quiet-app .reader-open .focus-rail { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; height: min(62dvh, 570px); max-height: none; padding-bottom: env(safe-area-inset-bottom); }
   .quiet-app .focus-breadcrumb { left: 8px; top: 5px; max-width: calc(100% - 16px); }
   .quiet-app .focus-breadcrumb button { font-size: 11px; }
+  .quiet-app .breadcrumb-chips { gap: 5px; }
+  .quiet-app .breadcrumb-chips li { gap: 5px; }
+  .quiet-app .breadcrumb-chips .crumb-chip { max-width: min(270px,70vw); padding: 5px 9px; }
   .quiet-app .lens-zoom { bottom: 12px; left: 10px; }
   .quiet-app .lens-coverage { bottom: 12px; right: 10px; }
   .quiet-app .lens-coverage-summary > button { font-size: 11px; padding: 7px 8px; }
