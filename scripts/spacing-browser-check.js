@@ -8,7 +8,10 @@ async(page)=>{
  const checks=[],comparisons=[],errors=[];const listen=e=>errors.push(e.message);page.on('pageerror',listen);
  const check=(ok,name)=>{if(!ok)throw Error(name);checks.push(name);};
  const enter=async(id,spacing='compact')=>{await page.goto(base+'?at='+encodeURIComponent(id)+'&revision='+data.graph_hash+'&spacing='+spacing);await page.locator('.lens-boundary').waitFor();await page.waitForTimeout(220);await page.mouse.move(10,200);};
- const lengths=()=>page.locator('.lens-svg').evaluate(el=>({radius:Number(el.querySelector('.lens-boundary').getAttribute('r')),paths:[...el.querySelectorAll('[data-graph-edge]')].map(p=>({id:p.getAttribute('data-graph-edge'),length:p.getTotalLength()}))}));
+ const lengths=()=>page.locator('.lens-svg').evaluate(el=>{
+  const circle=el.querySelector('.lens-boundary'),radius=Number(circle.getAttribute('r')),cx=Number(circle.getAttribute('cx')),cy=Number(circle.getAttribute('cy'));
+  return {radius,points:[...el.querySelectorAll('[data-lens-node]')].map(n=>{const p=n.transform.baseVal.consolidate().matrix;return {id:n.getAttribute('data-lens-node'),parent:n.getAttribute('data-parent'),radius:Math.hypot(p.e-cx,p.f-cy)/radius};}),paths:[...el.querySelectorAll('[data-graph-edge]')].map(p=>({id:p.getAttribute('data-graph-edge'),length:p.getTotalLength()}))};
+ });
  try{
   await page.setViewportSize({width:1440,height:1000});
   for(const id of targets){
@@ -17,8 +20,11 @@ async(page)=>{
    check(await page.locator('.lens-view').getAttribute('data-focus-caption')===id,'Same focus identity: '+id);
    check(await page.locator(`[data-label-for="${id}"]`).count()===1,'Focused caption remains readable: '+id);
    check(before.radius===after.radius&&before.paths.length===after.paths.length,'Same disk and connections: '+id);
-   const long=before.paths.filter(p=>p.length>before.radius*.75);
-   check(long.every(p=>byId.get(p.id)<p.length-.01),'Every long connection contracts: '+id);
+   const afterPoints=new Map(after.points.map(p=>[p.id,p.radius]));
+   check(before.points.filter(p=>p.radius>=.98).every(p=>Math.abs(afterPoints.get(p.id)-p.radius)<1e-6),'Distant nodes retain their outer-ring positions: '+id);
+   const parents=new Map(before.points.map(p=>[p.id,p.parent]));
+   const long=before.paths.filter(p=>p.length>before.radius*.75&&(p.id===id||parents.get(p.id)===id));
+   check(long.every(p=>byId.get(p.id)<p.length-.01),'Long focus connections contract; outer context stays on the rim: '+id);
    comparisons.push({id,long:long.length,reductions:long.map(p=>1-byId.get(p.id)/p.length)});
   }
   // Same camera movement: the parent stays inside the unchanged optical core.

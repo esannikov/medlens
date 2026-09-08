@@ -51,12 +51,17 @@ async(page)=>{
   const box=await page.locator('.lens-svg').boundingBox(),r=Number(await page.locator('.lens-boundary').getAttribute('r'));
   await page.mouse.move(box.x+box.width*.45,box.y+box.height*.5);await page.mouse.down();
   await page.mouse.move(box.x+box.width*.45+r*.4,box.y+box.height*.5+r*.1,{steps:12});await page.waitForTimeout(220);await page.mouse.up();
-  check(await focus()==='group:imaging_study','Regression pan remains in imaging');
+  check(await page.locator('[data-crumb-id="group:imaging_study"]').count()===1,'Regression pan remains in the imaging branch');
   check(!(await labels()).includes('EV-ST-FDCDA56787FC7BA5'),'Myelogram stays unlabeled in the formerly failing pan phase');
-  check((await labels()).every(id=>id==='PT-CASE024'||id==='group:imaging_study'||id.startsWith('EV-')),'Imaging overview does not expand findings');
+  const imagingIds=await page.locator('[data-lens-node]').evaluateAll(els=>{
+   const parent=new Map(els.map(el=>[el.getAttribute('data-lens-node'),el.getAttribute('data-parent')]));
+   return [...parent.keys()].filter(id=>{let at=id;while(at){if(at==='group:imaging_study')return true;at=parent.get(at);}return false;});
+  });
+  check((await labels()).every(id=>id==='PT-CASE024'||imagingIds.includes(id)),'Earlier handoff only reveals the reached imaging subtree');
   await page.screenshot({path:'output/playwright/reveal-imaging-pan.png'});
+  const beforeKey=await focus();
   await page.locator('.lens-svg').focus();await page.keyboard.press('ArrowRight');await page.waitForTimeout(520);
-  check((await focus()).startsWith('EV-'),'Keyboard opens the next logical level');
+  check(await page.locator(`[data-lens-node="${await focus()}"]`).getAttribute('data-parent')===beforeKey,'Keyboard opens the next logical level');
   await page.keyboard.press('Enter');await page.waitForTimeout(100);
   check(await page.locator('.focus-rail').getAttribute('data-reader-object')===await focus(),'Keyboard reading stays aligned');
   await page.setViewportSize({width:390,height:844});await enter(flc);

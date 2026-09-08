@@ -2,7 +2,8 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Keyb
 import {
   clampDisk,
   focusPoint,
-  focusForAnchor,
+  panCamera,
+  rotateVec,
   compactPoint,
   expandPoint,
   lensCompression,
@@ -74,7 +75,7 @@ export function Lens({
   readerOpen?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
-    drag = useRef<{ x: number; y: number; world: Vec; anchor: Vec; moved: boolean } | null>(
+    drag = useRef<{ x: number; y: number; focus: Vec; rotation:number; from:Vec; anchor: Vec; moved: boolean } | null>(
       null,
     ),
     frame = useRef(0);
@@ -88,6 +89,7 @@ export function Lens({
   const [size, setSize] = useState({ width: 800, height: 500 });
   const [focus, setFocus] = useState<Vec>(() => lm.nodes.get(selected)!.p2),
     currentFocus = useRef(focus);
+  const [rotation,setRotation]=useState(0),currentRotation=useRef(0);
   const [zoom, setZoom] = useState(1),
     [moving, setMoving] = useState(false),
     [hovered, setHovered] = useState<string | null>(null);
@@ -117,10 +119,12 @@ export function Lens({
     setHovered(null);
     const from = currentFocus.current,
       target = lm.nodes.get(cameraTarget || selected)!.p2;
+    const turn=currentRotation.current;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (norm(focusPoint(target, from)) < 1e-6 || reduced) {
+    if (norm(focusPoint(target,from)) < 1e-6 && Math.abs(turn)<1e-6 || reduced) {
       currentFocus.current = target;
-      setFocus(target);
+      currentRotation.current=0;
+      setFocus(target);setRotation(0);
       setMoving(false);
       return;
     }
@@ -129,9 +133,12 @@ export function Lens({
     const start = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / 420),
-        p = lerpVec(from, target, 1 - (1 - t) ** 4);
+        ease=1-(1-t)**4,p=lerpVec(from,target,ease),angle=turn*(1-ease);
+      // Explicit navigation returns to the canonical view, as a URL reload
+      // does. Only direct manipulation needs to retain the transported frame.
       currentFocus.current = p;
-      setFocus(p);
+      currentRotation.current=angle;
+      setFocus(p);setRotation(angle);
       if (t < 1) frame.current = requestAnimationFrame(tick);
       else {
         // Settle a clicked destination with fresh clearance. Dragging thereafter
@@ -145,8 +152,8 @@ export function Lens({
   }, [selected, cameraTarget, centerKey, lm]);
   const geometry = useMemo(
     () =>
-      lensGeometry(lm, selected, scope, focus, size.width, size.height, zoom),
-    [lm, selected, scope, focus, size, zoom],
+      lensGeometry(lm, selected, scope, focus, size.width, size.height, zoom,rotation),
+    [lm, selected, scope, focus, size, zoom,rotation],
   );
   const {points,radius,centerId:geometricFocusId}=geometry;
   const centerId=useReadingFocus(lm,scope,points,geometricFocusId,cameraTarget||selected,centerKey,moving&&!drag.current?.moved);
@@ -209,8 +216,8 @@ export function Lens({
   const sourceEdgeIds = new Set(sourceEdges.map(edge => edge.id));
   const tracedNodes = new Set(sourceEdges.flatMap(edge => [edge.source, edge.target]));
   const structuralPaths = exactEdges.map(edge => {
-    const from = focusPoint(lm.nodes.get(edge.source)!.p2,focus),to=focusPoint(lm.nodes.get(edge.target)!.p2,focus);
-    const projected = geodesic(from,to).map(p=>compactPoint(p,lm.spacing,lensCompression(radius))).map(([x,y])=>[size.width/2+x*radius,size.height/2-y*radius]);
+    const from=pointsById.get(edge.source)!.p,to=pointsById.get(edge.target)!.p;
+    const projected=geodesic(from,to).map(([x,y])=>[size.width/2+x*radius,size.height/2-y*radius]);
     return { ...edge, trace: sourceEdgeIds.has(edge.id), d: projected.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ") };
   });
   const paintedPaths = paths.map(path => {
@@ -243,10 +250,28 @@ export function Lens({
       else onSelect(id);
     }
   };
+  const pointerNode=(target:EventTarget,clientX:number,clientY:number)=>{
+    const element=target as Element;
+    if(element.closest('[data-compass-cluster]'))return null;
+    const caption=element.closest('[data-label-for]');
+    const bounds=svg.current!.getBoundingClientRect();
+    const x=(clientX-bounds.left)*size.width/bounds.width,y=(clientY-bounds.top)*size.height/bounds.height;
+    let nearest:string|null=null,best=Infinity,core=0;
+    for(const p of points){
+      const kind=lm.nodes.get(p.id)!.kind;
+      const hit=p.detail||kind==='clinical_event'||kind==='group'?Math.max(22,p.radius+4):p.radius+2;
+      const distance=Math.hypot(p.x-x,p.y-y);
+      if(distance<=hit&&distance<best){nearest=p.id;best=distance;core=p.radius+2;}
+    }
+    if(caption&&best>core)return caption.getAttribute('data-label-for');
+    return nearest;
+  };
   const recenter = () => {
     cancelAnimationFrame(frame.current);
     currentFocus.current = focusNode.p2;
     setFocus(focusNode.p2);
+    currentRotation.current=0;
+    setRotation(0);
     setZoom(1);
     setMoving(false);
     setHovered(null);
@@ -287,6 +312,13 @@ export function Lens({
           tabIndex={0}
           aria-label="Інтерактивна 2D-лінза графа"
           aria-describedby={`${volumeId}-keyboard`}
+          onClickCapture={e=>{
+            if((e.target as Element).closest('[data-compass-cluster]'))return;
+            const id=pointerNode(e.target,e.clientX,e.clientY);
+            if((e.target as Element).closest('[data-label-for]')?.getAttribute('data-label-for')===id)return;
+            if(id){e.stopPropagation();choose(id);}
+          }}
+          onPointerLeave={()=>setHovered(null)}
           onKeyDown={e => {
             const keyboardTarget=centerId;
             handleNavigation(e, keyboardTarget);
@@ -298,12 +330,11 @@ export function Lens({
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             const bounds=e.currentTarget.getBoundingClientRect();
-            const target=(e.target as Element).closest('[data-lens-node],[data-label-for]');
-            const id=target?.getAttribute('data-lens-node')||target?.getAttribute('data-label-for');
+            const id=pointerNode(e.target,e.clientX,e.clientY);
             const node=id?lm.nodes.get(id):undefined;
             // Labels retain their initial pointer-to-node offset. Background
             // drags grab the actual disk location rather than its centre.
-            const anchor:Vec=node?compactPoint(focusPoint(node.p2,currentFocus.current),lm.spacing,lensCompression(radius)):clampDisk([
+            const anchor:Vec=node?compactPoint(rotateVec(focusPoint(node.p2,currentFocus.current),currentRotation.current),lm.spacing,lensCompression(radius)):clampDisk([
               (e.clientX-bounds.left-size.width/2)/radius,
               -(e.clientY-bounds.top-size.height/2)/radius,
             ],.995);
@@ -312,7 +343,9 @@ export function Lens({
             drag.current = {
               x: e.clientX,
               y: e.clientY,
-              world: node?.p2 || focusPoint(expandPoint(anchor,lm.spacing,lensCompression(radius)),currentFocus.current.map(v=>-v) as Vec),
+              focus:currentFocus.current,
+              rotation:currentRotation.current,
+              from:expandPoint(anchor,lm.spacing,lensCompression(radius)),
               anchor,
               moved: false,
             };
@@ -320,8 +353,7 @@ export function Lens({
           onPointerMove={(e) => {
             if(!e.buttons){
               drag.current=null;
-              const target=(e.target as Element).closest('[data-lens-node],[data-label-for]');
-              setHovered(target?.getAttribute('data-lens-node')||target?.getAttribute('data-label-for')||null);
+              setHovered(pointerNode(e.target,e.clientX,e.clientY));
               return;
             }
             const d = drag.current;
@@ -334,12 +366,13 @@ export function Lens({
               setMoving(true);
               setHovered(null);
               e.currentTarget.setPointerCapture(e.pointerId);
-              const next = focusForAnchor(d.world,expandPoint(clampDisk([
+              const next = panCamera(d.focus,d.rotation,d.from,expandPoint(clampDisk([
                 d.anchor[0]+(e.clientX-d.x)/radius,
                 d.anchor[1]-(e.clientY-d.y)/radius,
               ],.995),lm.spacing,lensCompression(radius)));
-              currentFocus.current = next;
-              setFocus(next);
+              currentFocus.current = next.focus;
+              currentRotation.current=next.rotation;
+              setFocus(next.focus);setRotation(next.rotation);
             }
           }}
           onPointerUp={(e) => {
@@ -470,8 +503,6 @@ export function Lens({
                   className="node-target"
                   transform={`translate(${p.x} ${p.y})`}
                   onClick={() => choose(p.id)}
-                  onMouseEnter={() => !moving && !drag.current?.moved && setHovered(p.id)}
-                  onMouseLeave={() => setHovered(null)}
                   role="button"
                   tabIndex={-1}
                   aria-label={`${content.kind}: ${n.title}. ${content.content}. ${content.action}`}
@@ -555,8 +586,6 @@ export function Lens({
                       else onSelect(b.id);
                     }
                   }}
-                  onMouseEnter={() => !moving && setHovered(b.id)}
-                  onMouseLeave={() => setHovered(null)}
                   onFocus={() => setHovered(b.id)}
                   onBlur={() => setHovered(null)}
                 >

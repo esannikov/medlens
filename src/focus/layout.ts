@@ -1,6 +1,7 @@
 import {
   counted,
   focusPoint,
+  rotateVec,
   compactPoint,
   lensCompression,
   geodesic,
@@ -301,6 +302,7 @@ export function lensGeometry(
   width: number,
   height: number,
   zoom = 1,
+  rotation = 0,
 ) {
   const centerId = focusCenter(lm, scope, focus);
   const ctx = neighborhood(lm, centerId, scope);
@@ -312,7 +314,7 @@ export function lensGeometry(
     width / 2 + p[0] * radius,
     height / 2 - p[1] * radius,
   ];
-  const raw=new Map(lm.order.map(n=>[n.id,focusPoint(n.p2,focus)]));
+  const raw=new Map(lm.order.map(n=>[n.id,rotateVec(focusPoint(n.p2,focus),rotation)]));
   const points: Point[] = lm.order.map((n) => {
     const p = compactPoint(raw.get(n.id)!,lm.spacing,lensCompression(radius)),
       [x, y] = project(p),
@@ -337,10 +339,13 @@ export function lensGeometry(
       detail,
     };
   });
+  const byId=new Map(points.map(p=>[p.id,p]));
   // Every navigation node keeps its parent connection, including the perimeter.
+  // Route once between the final endpoints. Warping the interior of an old
+  // arc creates S-bends as it crosses the compressed annulus.
   const paths: Path[] = lm.displayEdges.map((e) => ({
     ...e,
-    points: geodesic(raw.get(e.source)!,raw.get(e.target)!).map(p=>project(compactPoint(p,lm.spacing,lensCompression(radius)))),
+    points: geodesic(byId.get(e.source)!.p,byId.get(e.target)!.p).map(project),
     local:
       ctx.local.has(e.target) &&
       (ctx.local.has(e.source) || e.source === ctx.parent?.id),
@@ -445,8 +450,6 @@ export function placeLabels(
       }
       const titleSize = 11.5 * textScale + (baseSize - 11.5 * textScale) * Math.max(0, 1 - distance) ** 0.8;
       const titleFont = `${weight} ${titleSize}px ${family}`;
-      const scale = titleSize / baseSize;
-      const limit = (baseWidth - 8) * scale + 8;
       const dateText = (variant < 7 || variant >= 9) &&
         (n.kind === "clinical_event" || n.kind === "temporal_relation" || (!compact && detailLevel === "near" && ["observation", "finding", "specimen"].includes(n.kind)))
           ? lm.times.get(n.id)!.text
@@ -463,15 +466,14 @@ export function placeLabels(
         : [];
       const contentLines = brief ? wrapText(brief, stableValueWidth, measure, `${innerType.detailSize}px ${family}`, Infinity) : [];
       const content = brief;
-      const w = (caption.disclosure ? 16 : 0) + Math.min(
-        limit,
-        Math.max(
+      // The box must contain the actual value/date ink, not just the scaled
+      // title width. Clamping here silently cropped long values near the rim.
+      const w = (caption.disclosure ? 16 : 0) + Math.max(
           44,
           ...lines.map((t) => measure(t, titleFont) + 8),
           ...dateLines.map((t) => measure(t, metaFont) + 8),
           ...contentLines.map(t => measure(t, valueFont) + 8),
           meta ? measure(meta, metaFont) + 8 : 0,
-        ),
       );
       const titleLineHeight = titleSize * 1.2;
       const metaBand = meta ? metaSize * 1.3 + 3 : 0;

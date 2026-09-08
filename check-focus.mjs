@@ -275,7 +275,7 @@ for (const [width, height] of [
         "Every displayed label is complete navigation text");
       assert.equal(b.contentLines.join(" "),b.content.replace(/\s+/g," "), "Displayed values must not be ellipsized");
       for(const line of b.contentLines)
-        assert(measure(line,`${b.detailSize}px`) <= b.w-8+1e-6,"Full value fits at every lens distance");
+        assert(measure(line,`${b.detailSize}px`) <= b.w-8+1e-6,`Full value fits: ${b.id}, variant ${b.variant}, needs ${measure(line,`${b.detailSize}px`)}, available ${b.w-8}`);
       assert(b.h >= (b.variant>=9?32:44), "Compact ink boxes are separate from 44px SVG hit areas");
       for (const other of boxes)
         if (other.id !== b.id) assert(!overlaps(b, other), "Label collision");

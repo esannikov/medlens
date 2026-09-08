@@ -92,26 +92,45 @@ export function focusForAnchor(world: Vec, target: Vec): Vec {
 export const lerpVec = (a: Vec, b: Vec, t: number): Vec =>
   a.map((v, i) => v + (b[i] - v) * t) as Vec;
 
+export const rotateVec=(p:Vec,angle:number):Vec=>[
+  p[0]*Math.cos(angle)-p[1]*Math.sin(angle),
+  p[0]*Math.sin(angle)+p[1]*Math.cos(angle),
+];
+/** Compose T(-to) ∘ T(from) in the grabbed point's existing camera frame.
+ * Keeping the rotation term is essential: discarding it pins the grabbed
+ * node but makes its children orbit the centre while the parent is dragged. */
+export function panCamera(focus:Vec,rotation:number,from:Vec,to:Vec){
+  if(norm([from[0]-to[0],from[1]-to[1]])<1e-12)return {focus,rotation};
+  const negative=(v:Vec)=>v.map(x=>-x) as Vec;
+  const nextFocus=clampDisk(focusPoint(rotateVec(focusPoint(negative(to),negative(from)),-rotation),negative(focus)),1-1e-9);
+  const project=(world:Vec)=>focusPoint(focusPoint(rotateVec(focusPoint(world,focus),rotation),from),negative(to));
+  const probe=project(focusPoint([.1,0],negative(nextFocus)));
+  return {focus:nextFocus,rotation:Math.atan2(probe[1],probe[0])};
+}
+
 export type LensSpacing = 'compact' | 'original';
 
-// Keep the complete optical reading zone intact, including its label clearance.
-const COMPACT_CORE=.5, COMPACT_RATE=.35, COMPACT_EASE=6;
+const smoothRange=(start:number,end:number,value:number)=>{
+  const t=Math.max(0,Math.min(1,(value-start)/(end-start)));
+  return t*t*(3-2*t);
+};
+// Compress travel through the middle annulus, not the entire dossier.
+// The centre and outer rim remain fixed. On the descending part f'(r) is
+// at least 1 - .36*1.5/.65 > 0; recovery at the rim only increases it.
+const COMPACT_CORE=.2;
+const compactRadius=(r:number,strength:number)=>
+  r-.36*strength*smoothRange(COMPACT_CORE,.85,r)*(1-smoothRange(.94,.98,r));
 export const lensCompression=(radius:number)=>{
   const t=Math.max(0,Math.min(1,(radius-200)/160));
   return t*t*(3-2*t);
 };
-const compactDistance=(d:number,strength:number)=>{
-  const start=Math.atanh(COMPACT_CORE),delta=d-start;
-  const rate=1-(1-COMPACT_RATE)*strength;
-  return delta<=0?d:start+rate*delta+(1-rate)*Math.tanh(COMPACT_EASE*delta)/COMPACT_EASE;
-};
-/** One monotone radial map for nodes AND every point of their connections.
- * The core is unchanged; long spans contract continuously during camera motion.
- * g'(d)=rate+(1-rate)*sech²(ease*d)>0: no folding or swapped branch order. */
+/** One monotone radial map for nodes; route arcs between the final endpoints.
+ * The middle annulus contracts enough to bridge parent/child focus zones,
+ * while the rim retains distant context. No folding or swapped branch order. */
 export function compactPoint(p:Vec,spacing:LensSpacing='compact',strength=1):Vec{
   const r=norm(p);
-  if(spacing==='original'||strength===0||r<=COMPACT_CORE)return p;
-  const mapped=Math.tanh(compactDistance(Math.atanh(Math.min(r,1-1e-12)),strength));
+  if(spacing==='original'||strength===0||r<=COMPACT_CORE||r>=.98)return p;
+  const mapped=compactRadius(r,strength);
   return p.map(v=>v*mapped/r) as Vec;
 }
 /** Exact inverse of the same map for pointer anchoring. */
@@ -119,14 +138,13 @@ export function expandPoint(p:Vec,spacing:LensSpacing='compact',strength=1):Vec{
   if(spacing==='original'||strength===0)return p;
   p=clampDisk(p,1-1e-9);
   const r=norm(p);
-  if(r<=COMPACT_CORE)return p;
-  const target=Math.atanh(r);
-  let lo=target,hi=target/COMPACT_RATE;
+  if(r<=COMPACT_CORE||r>=.98)return p;
+  let lo=r,hi=1;
   for(let i=0;i<48;i++){
     const mid=(lo+hi)/2;
-    if(compactDistance(mid,strength)<target)lo=mid;else hi=mid;
+    if(compactRadius(mid,strength)<r)lo=mid;else hi=mid;
   }
-  const raw=Math.tanh((lo+hi)/2);
+  const raw=(lo+hi)/2;
   return p.map(v=>v*raw/r) as Vec;
 }
 

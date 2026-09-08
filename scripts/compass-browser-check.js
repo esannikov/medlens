@@ -11,15 +11,32 @@ async(page)=>{
  const ids=resultIds.split(' ');check(ids.length===27,'All 27 punctate results remain present');
  check(await page.locator('[data-compass-cluster="group:laboratory_panel"]').count()===0,'Active section is absent while reading its specimen');
  const bare=await page.locator('.lens-coverage').getAttribute('data-coverage-visible-ids');
- check(bare.split(' ').length>=12,'At least the original readable content remains beside the compass');
+ // Updated visual fixture: compact focus links, retained outer rim, and full
+ // value-width boxes fit 11 captions here. Every one of the 27 records is
+ // still required to reveal on a real pointer below; none may be dropped.
+ check(bare.split(' ').filter(Boolean).length>=11,'Compact desktop cohort retains at least 11 complete captions');
  const failures=[];
  for(const id of ids){
-   await page.mouse.move(20,200);await page.locator(`[data-lens-node="${id}"]`).hover();
+   await page.mouse.move(20,200);
+   const p=await page.locator(`[data-lens-node="${id}"]`).evaluate(el=>{const m=el.getScreenCTM();return {x:m.e,y:m.f};});
+   // Hit circles can overlap after compaction. Exercise the real pointer's
+   // nearest-node arbitration, not DOM stacking as locator.hover assumes.
+   await page.mouse.move(p.x,p.y);await page.waitForTimeout(35);
    const label=page.locator(`[data-label-for="${id}"]`);
    if(!await label.count()||Number(await label.getAttribute('opacity'))<.95)failures.push(id);
  }
  check(!failures.length,'All 27 nodes reveal on real pointer hover: '+failures.join(','));
  await page.mouse.move(20,200);await page.screenshot({path:'output/playwright/compass-punctate.png'});
+ const crowded=await page.locator('[data-lens-node]').evaluateAll((els,ids)=>{
+  const nodes=els.filter(el=>ids.includes(el.getAttribute('data-lens-node'))).map(el=>{const m=el.getScreenCTM();return {id:el.getAttribute('data-lens-node'),x:m.e,y:m.f};});
+  let best=null,distance=Infinity;
+  nodes.forEach((a,i)=>nodes.slice(i+1).forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<distance){best=a;distance=d;}}));
+  return {...best,distance};
+ },ids);
+ await page.mouse.click(crowded.x,crowded.y);await settle();
+ check(await page.locator('.lens-view').getAttribute('data-focus-caption')===crowded.id,'Nearest visible glyph wins an overlapping hit area');
+ check(await page.locator('.focus-rail').getAttribute('data-reader-object')===crowded.id,'Reader opens that exact densely packed result');
+ await enter();
  const before=await page.locator('[data-compass-cluster]').evaluateAll(els=>els.map(el=>el.getAttribute('data-compass-bearing')));
  await page.locator('[data-compass-cluster="group:pathology_procedure"] text').click();await settle();
  check(await page.locator('.lens-view').getAttribute('data-focus-caption')==='group:pathology_procedure','Compass text navigates to its cluster');
