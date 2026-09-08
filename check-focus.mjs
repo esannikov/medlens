@@ -10,6 +10,7 @@ import {
   lensTypography,
   graphCaption,
   connectionStyle,
+  hierarchyStroke,
 } from "./src/focus/layout.ts";
 import {
   createLensModel,
@@ -149,12 +150,24 @@ const serum=lm.order.find(n=>n.kind==="specimen" && n.title==="сироватк�
 const serumGeometry=lensGeometry(lm,serum.id,all,serum.p2,1440,800);
 assert(placeLabels(lm,serum.id,all,serumGeometry.points,serumGeometry.paths,1440,800,measure).some(b=>b.id===serum.id),
   "The central material name must remain present inside a result fan");
-for(const t of [0,0.25,0.5,1]) {
-  const route=connectionStyle(t,"route","balanced"),branch=connectionStyle(t,"branch","balanced"),context=connectionStyle(t,"context","balanced");
-  assert(route.width>branch.width && branch.width>context.width,"Stroke hierarchy identifies navigation, branch and context");
-  assert(connectionStyle(t,"branch","bold").width>branch.width && connectionStyle(t,"branch","fine").width<branch.width);
-  assert(context.width>=0.65,"Context connections remain present");
+let hierarchyChecks=0;
+for(const profile of ['fine','balanced','bold']) for(const t of [0,0.25,0.5,1]) {
+  for(const edge of lm.displayEdges) {
+    const child=lm.nodes.get(edge.target),parent=lm.nodes.get(edge.source);
+    const route=connectionStyle(t,"route",profile,child.depth),branch=connectionStyle(t,"branch",profile,child.depth),context=connectionStyle(t,"context",profile,child.depth);
+    assert.equal(route.width,branch.width,"Hover and route emphasis do not change the depth encoding");
+    assert.equal(branch.width,context.width,"Peripheral width has the same depth meaning");
+    assert.equal(branch.width,hierarchyStroke(child.depth,profile),"Width is independent of geometric focus");
+    if(parent.depth>0) assert(route.width<hierarchyStroke(parent.depth,profile),"Every child link is thinner than its parent link, in every cluster");
+    assert(route.opacity>branch.opacity && branch.opacity>context.opacity,"Brightness retains navigation emphasis");
+    assert(connectionStyle(t,"branch","bold",child.depth).width>hierarchyStroke(child.depth) && connectionStyle(t,"branch","fine",child.depth).width<hierarchyStroke(child.depth));
+    assert(context.width>=0.55*0.75,"Even fine-profile peripheral connections stay visible");
+    hierarchyChecks++;
+  }
 }
+assert.equal(hierarchyStroke(1),3.2);
+assert.equal(hierarchyStroke(4),3.2*0.64**3);
+assert.equal(hierarchyStroke(20),0.55,"Future deep trees retain a hairline floor");
 for (const n of lm.order) {
   const caption=graphCaption(lm,n);
   assert(!caption.title.includes("…"), "Navigation captions must not be clipped clinical assertions");
@@ -406,6 +419,7 @@ console.log(
     captionFallbacks,
     navigationChecks,
     motionChecks,
+    hierarchyChecks,
     scope:
       "2D focus navigation; thin context connections; unboxed adjacent text protecting nodes and active branch; continuous type scale; dates and comparison endpoints; no clinical mutation",
   }),

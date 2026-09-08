@@ -211,11 +211,17 @@ export const lineProfiles = {
   bold: { label: "Виразні", factor: 1.35 },
 };
 export type LineProfile = keyof typeof lineProfiles;
-/** Display emphasis only, never confidence, diagnostic importance or quantity. */
-export function connectionStyle(near: number, role: "route" | "branch" | "context", profile: LineProfile) {
-  const t = Math.max(0, Math.min(1, near)), factor = lineProfiles[profile].factor;
+/** Absolute tree depth, never distance from the selected node or clinical weight.
+ * Each generation is 64% of its parent's stroke: 3.2 / 2.05 / 1.31 / .84px.
+ * Keep a readable floor if a future dossier introduces more nesting. */
+export function hierarchyStroke(depth: number, profile: LineProfile = "balanced") {
+  return lineProfiles[profile].factor * Math.max(0.55, 3.2 * 0.64 ** Math.max(0, depth - 1));
+}
+/** Focus changes opacity only, so dragging/hover cannot invert the hierarchy. */
+export function connectionStyle(near: number, role: "route" | "branch" | "context", profile: LineProfile, depth: number) {
+  const t = Math.max(0, Math.min(1, near));
   return {
-    width: factor * (role === "route" ? 1.65 + 0.7*t : role === "branch" ? 0.85 + 0.7*t : 0.65 + 0.12*t),
+    width: hierarchyStroke(depth, profile),
     opacity: role === "route" ? 0.86 : role === "branch" ? 0.34 + 0.42*t : 0.2 + 0.12*t,
   };
 }

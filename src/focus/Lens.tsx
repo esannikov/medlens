@@ -23,6 +23,7 @@ import {
   graphCaption,
   overlaps,
   connectionStyle,
+  hierarchyStroke,
   nodeKinds,
   placeLabels,
   preview,
@@ -218,15 +219,19 @@ export function Lens({
   const structuralPaths = exactEdges.map(edge => {
     const from=pointsById.get(edge.source)!.p,to=pointsById.get(edge.target)!.p;
     const projected=geodesic(from,to).map(([x,y])=>[size.width/2+x*radius,size.height/2-y*radius]);
-    return { ...edge, trace: sourceEdgeIds.has(edge.id), d: projected.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ") };
+    // Supplied cross-links may skip a display level. Use the deeper endpoint;
+    // do not fabricate intermediate nodes or flatten source-trace strokes.
+    const depth=Math.max(lm.nodes.get(edge.source)!.depth,lm.nodes.get(edge.target)!.depth);
+    return { ...edge, depth, width:hierarchyStroke(depth), trace: sourceEdgeIds.has(edge.id), d: projected.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ") };
   });
   const paintedPaths = paths.map(path => {
     const from=pointsById.get(path.source)!, to=pointsById.get(path.target)!;
     const role = from.active && to.active && highlighted.has(path.source) && highlighted.has(path.target)
       ? "route" : from.active && to.active && branch.has(path.source) && branch.has(path.target) ? "branch" : "context";
-    const style=connectionStyle(1-Math.min(norm(from.p),norm(to.p)),role,"balanced");
+    const depth=lm.nodes.get(path.target)!.depth;
+    const style=connectionStyle(1-Math.min(norm(from.p),norm(to.p)),role,"balanced",depth);
     const namedPath=labelIds.has(path.target)&&reveal.allowedIds.has(path.source)||reveal.previewIds.has(path.source)&&reveal.previewIds.has(path.target);
-    return {...path, role, ...style,opacity:namedPath?Math.max(.62,style.opacity):role==='context'?.12:style.opacity,
+    return {...path, role, depth, ...style,opacity:namedPath?Math.max(.62,style.opacity):role==='context'?.12:style.opacity,
       d:path.points.map(([x,y],i)=>`${i ? "L" : "M"}${x},${y}`).join(" ")};
   });
   const playGlint = () => {
@@ -455,7 +460,7 @@ export function Lens({
           </g>
           <g fill="none" filter={`url(#${volumeId}-glow)`} pointerEvents="none" aria-hidden="true">
             {paintedPaths.filter(p=>p.role!=="context").map(path=><path key={path.target} d={path.d} stroke={lm.nodes.get(path.target)!.color}
-              strokeWidth={path.width+3} opacity={path.opacity*0.09} />)}
+              strokeWidth={path.width*1.65} opacity={path.opacity*0.09} />)}
           </g>
           <g fill="none">
             {paintedPaths.map((path) => {
@@ -464,6 +469,7 @@ export function Lens({
                   key={path.target}
                   data-graph-edge={path.target}
                   data-edge-role={path.role}
+                  data-edge-depth={path.depth}
                   className="lens-connection"
                   d={path.d}
                   stroke={lm.nodes.get(path.target)!.color}
@@ -478,7 +484,7 @@ export function Lens({
           <g className="lens-structural-edges" fill="none" pointerEvents="none">
             {structuralPaths.map(path => <path key={path.id} d={path.d} data-structural-edge={path.id}
               data-structural-source={path.source} data-structural-target={path.target} data-structural-relation={path.relation}
-              data-source-path={path.trace} stroke={path.trace ? "#824b16" : "#504165"} strokeWidth={path.trace ? 2 : 1.6}
+              data-source-path={path.trace} data-edge-depth={path.depth} stroke={path.trace ? "#824b16" : "#504165"} strokeWidth={path.width}
               strokeDasharray={path.trace ? undefined : "8 3"} opacity="0.86" markerEnd={`url(#${volumeId}-edge-arrow)`}>
               <title>{structuralRelationNames[path.relation] || path.relation}: {lm.nodes.get(path.source)!.title} → {lm.nodes.get(path.target)!.title}</title>
             </path>)}
